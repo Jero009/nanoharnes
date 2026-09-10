@@ -1,8 +1,16 @@
 from pathlib import Path
+import os
 import shutil
 import typer
 
 from .sandbox import ALLOWED_DIR, check_path_allowed
+
+# Global safety switch
+YOLO_MODE = False
+
+def set_yolo_mode(enabled: bool):
+    global YOLO_MODE
+    YOLO_MODE = enabled
 
 
 def read_file(file_path: str) -> str:
@@ -67,7 +75,7 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
 
 
 def delete_file(file_path: str) -> str:
-    """Deletes a file after user approval."""
+    """Deletes a file after user approval (bypassed if YOLO_MODE is True)."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -76,11 +84,12 @@ def delete_file(file_path: str) -> str:
     if not target_path.exists():
         return f"Error: File '{file_path}' not found."
 
-    confirm = typer.confirm(
-        f"\n⚠️  [APPROVAL NEEDED] Agent wants to DELETE file: '{file_path}'. Allow?"
-    )
-    if not confirm:
-        return "Action canceled: User denied deletion request."
+    if not YOLO_MODE:
+        confirm = typer.confirm(
+            f"\n⚠️  [APPROVAL NEEDED] Agent wants to DELETE file: '{file_path}'. Allow?"
+        )
+        if not confirm:
+            return "Action canceled: User denied deletion request."
 
     try:
         target_path.unlink()

@@ -2,7 +2,7 @@
 - read file 
 - create file
 - edit file
-- delete file
+- delete file -require acept or yolo
 - rename file 
 
 todo 
@@ -13,4 +13,7 @@ todo
 - pwd 
 - ls 
 - mkdir 
-- rmdir 
+- rmdir - require accept or yolo
+
+
+/yolo

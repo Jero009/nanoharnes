@@ -3,6 +3,13 @@ import typer
 
 from .sandbox import ALLOWED_DIR, check_path_allowed
 
+# Global safety switch
+YOLO_MODE = False
+
+def set_yolo_mode(enabled: bool):
+    global YOLO_MODE
+    YOLO_MODE = enabled
+
 
 def pwd() -> str:
     """Returns the absolute path of the current working directory (workspace root)."""
@@ -53,7 +60,7 @@ def mkdir(dir_path: str) -> str:
 
 
 def rmdir(dir_path: str) -> str:
-    """Deletes an empty directory after user approval. dir_path e.g. "notes/archive". Fails if not empty or is workspace root."""
+    """Deletes an empty directory after user approval (bypassed if YOLO_MODE is True). dir_path e.g. "notes/archive". Fails if not empty or is workspace root."""
     target_path = (ALLOWED_DIR / dir_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -66,11 +73,12 @@ def rmdir(dir_path: str) -> str:
     if target_path == ALLOWED_DIR:
         return "Error: Cannot delete the workspace root directory."
 
-    confirm = typer.confirm(
-        f"\n⚠️  [APPROVAL NEEDED] Agent wants to DELETE directory: '{dir_path}'. Allow?"
-    )
-    if not confirm:
-        return "Action canceled: User denied deletion request."
+    if not YOLO_MODE:
+        confirm = typer.confirm(
+            f"\n⚠️  [APPROVAL NEEDED] Agent wants to DELETE directory: '{dir_path}'. Allow?"
+        )
+        if not confirm:
+            return "Action canceled: User denied deletion request."
 
     try:
         target_path.rmdir()
