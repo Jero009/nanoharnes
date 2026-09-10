@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 import typer
 
 from sandbox import ALLOWED_DIR, check_path_allowed
@@ -150,3 +151,73 @@ def rename_file(file_path: str, new_file_path: str) -> str:
         return f"Error: {exc!r}"
 
     return f"File renamed: {file_path} -> {new_file_path}"
+
+
+def move_file(file_path: str, new_file_path: str) -> str:
+    """Moves a file from one path to another within the workspace.
+
+    This is functionally the same as rename_file, provided under a separate
+    name for clarity when relocating a file into a different directory
+    rather than renaming it in place.
+
+    Args:
+        file_path: Current relative path of the file, e.g. "drafts/report.txt".
+        new_file_path: Destination relative path, e.g. "archive/report.txt".
+            Parent directories are created automatically if they don't exist.
+
+    Returns:
+        A success message, or an error message string if the move failed.
+    """
+    source_path = Path(file_path).resolve()
+    dest_path = Path(new_file_path).resolve()
+
+    error = check_path_allowed(source_path) or check_path_allowed(dest_path)
+    if error:
+        return error
+    if not source_path.exists():
+        return f"Error: File '{file_path}' not found."
+    if not source_path.is_file():
+        return f"Error: '{file_path}' is not a file."
+    if dest_path.exists():
+        return "Error: A file already exists at the destination."
+
+    try:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.rename(dest_path)
+    except Exception as exc:
+        return f"Error: {exc!r}"
+
+    return f"File moved: {file_path} -> {new_file_path}"
+
+
+def copy_file(file_path: str, new_file_path: str) -> str:
+    """Copies a file to a new path within the workspace, leaving the original in place.
+
+    Args:
+        file_path: Relative path of the file to copy, e.g. "notes/todo.txt".
+        new_file_path: Destination relative path for the copy, e.g. "notes/todo_backup.txt".
+            Parent directories are created automatically if they don't exist.
+
+    Returns:
+        A success message, or an error message string if the copy failed.
+    """
+    source_path = Path(file_path).resolve()
+    dest_path = Path(new_file_path).resolve()
+
+    error = check_path_allowed(source_path) or check_path_allowed(dest_path)
+    if error:
+        return error
+    if not source_path.exists():
+        return f"Error: File '{file_path}' not found."
+    if not source_path.is_file():
+        return f"Error: '{file_path}' is not a file."
+    if dest_path.exists():
+        return "Error: A file already exists at the destination."
+
+    try:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, dest_path)
+    except Exception as exc:
+        return f"Error: {exc!r}"
+
+    return f"File copied: {file_path} -> {new_file_path}"
