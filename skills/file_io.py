@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import typer
 
 def read_file(file_path: str) -> str:
     """Reads the content of a file and returns it as a string.
@@ -49,14 +49,13 @@ def edit_file(name: str, content: str, mode: str = "overwrite") -> str:
     return f"File updated ({mode} mode)."
 
 # skills/file_io.py
-from pathlib import Path
-import typer
 
-ALLOWED_DIR = Path("./workspace").resolve()
+
+ALLOWED_DIR = Path("workspace").resolve()
 
 
 def delete_file(file_path: str) -> str:
-    """Deletes the specified file inside the workspace after user confirmation."""
+    """Deletes the specified file inside the workspace ."""
     target_path = Path(file_path).resolve()
 
     # Directory restriction check
