@@ -4,7 +4,6 @@ from .file_io import (
     edit_file,
     delete_file,
     rename_file,
-    move_file,
     copy_file,
 )
 from .dir_io import (
@@ -20,7 +19,6 @@ FILE_TOOLS = [
     edit_file,
     delete_file,
     rename_file,
-    move_file,
     copy_file,
 ]
 

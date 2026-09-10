@@ -6,14 +6,7 @@ from sandbox import ALLOWED_DIR, check_path_allowed
 
 
 def read_file(file_path: str) -> str:
-    """Reads the content of a file and returns it as a string.
-
-    Args:
-        file_path: Relative path to the file to read, e.g. "notes/todo.txt".
-
-    Returns:
-        The file's text content, or an error message string if the read failed.
-    """
+    """Reads and returns the text content of a file at the given relative path."""
     target_path = Path(file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -31,16 +24,7 @@ def read_file(file_path: str) -> str:
 
 
 def create_file(file_path: str, content: str) -> str:
-    """Creates a new file with the given content. Fails if the file already exists.
-
-    Args:
-        file_path: Relative path for the new file, e.g. "notes/todo.txt".
-            Parent directories are created automatically if they don't exist.
-        content: The text content to write to the new file.
-
-    Returns:
-        A success message, or an error message string if creation failed.
-    """
+    """Creates a new file with text content at a relative path. Auto-creates parent directories. Fails if file already exists."""
     target_path = Path(file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -59,17 +43,7 @@ def create_file(file_path: str, content: str) -> str:
 
 
 def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
-    """Edits an existing file by overwriting or appending content. Fails if the file does not exist.
-
-    Args:
-        file_path: Relative path to the file to edit, e.g. "notes/todo.txt".
-        content: The text content to write or append.
-        mode: Either "overwrite" (replace all content) or "append" (add to the end).
-            Defaults to "overwrite".
-
-    Returns:
-        A success message, or an error message string if the edit failed.
-    """
+    """Edits an existing file at a relative path. 'mode' can be 'overwrite' (replace all) or 'append' (add to end). Fails if file is missing."""
     target_path = Path(file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -93,14 +67,7 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
 
 
 def delete_file(file_path: str) -> str:
-    """Deletes a file, after asking the user for approval.
-
-    Args:
-        file_path: Relative path to the file to delete, e.g. "notes/todo.txt".
-
-    Returns:
-        A success message, a cancellation message, or an error message string.
-    """
+    """Deletes a file at the given relative path. Prompts the user for approval before execution."""
     target_path = Path(file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -123,16 +90,7 @@ def delete_file(file_path: str) -> str:
 
 
 def rename_file(file_path: str, new_file_path: str) -> str:
-    """Renames or moves a file from one path to another within the workspace.
-
-    Args:
-        file_path: Current relative path of the file, e.g. "notes/old.txt".
-        new_file_path: New relative path for the file, e.g. "notes/new.txt".
-            Parent directories are created automatically if they don't exist.
-
-    Returns:
-        A success message, or an error message string if the rename failed.
-    """
+    """Renames/moves a file to a new relative path. Auto-creates parent directories. Fails if destination exists."""
     source_path = Path(file_path).resolve()
     dest_path = Path(new_file_path).resolve()
 
@@ -152,55 +110,8 @@ def rename_file(file_path: str, new_file_path: str) -> str:
 
     return f"File renamed: {file_path} -> {new_file_path}"
 
-
-def move_file(file_path: str, new_file_path: str) -> str:
-    """Moves a file from one path to another within the workspace.
-
-    This is functionally the same as rename_file, provided under a separate
-    name for clarity when relocating a file into a different directory
-    rather than renaming it in place.
-
-    Args:
-        file_path: Current relative path of the file, e.g. "drafts/report.txt".
-        new_file_path: Destination relative path, e.g. "archive/report.txt".
-            Parent directories are created automatically if they don't exist.
-
-    Returns:
-        A success message, or an error message string if the move failed.
-    """
-    source_path = Path(file_path).resolve()
-    dest_path = Path(new_file_path).resolve()
-
-    error = check_path_allowed(source_path) or check_path_allowed(dest_path)
-    if error:
-        return error
-    if not source_path.exists():
-        return f"Error: File '{file_path}' not found."
-    if not source_path.is_file():
-        return f"Error: '{file_path}' is not a file."
-    if dest_path.exists():
-        return "Error: A file already exists at the destination."
-
-    try:
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        source_path.rename(dest_path)
-    except Exception as exc:
-        return f"Error: {exc!r}"
-
-    return f"File moved: {file_path} -> {new_file_path}"
-
-
 def copy_file(file_path: str, new_file_path: str) -> str:
-    """Copies a file to a new path within the workspace, leaving the original in place.
-
-    Args:
-        file_path: Relative path of the file to copy, e.g. "notes/todo.txt".
-        new_file_path: Destination relative path for the copy, e.g. "notes/todo_backup.txt".
-            Parent directories are created automatically if they don't exist.
-
-    Returns:
-        A success message, or an error message string if the copy failed.
-    """
+    """Copies a file to a new relative path, leaving the original. Auto-creates parent directories. Fails if destination exists."""
     source_path = Path(file_path).resolve()
     dest_path = Path(new_file_path).resolve()
 
