@@ -1,15 +1,32 @@
 from pathlib import Path
 import typer
 
+ALLOWED_DIR = Path("workspace").resolve()
+
+
+def _check_allowed(target_path: Path) -> str | None:
+    """Returns an error string if target_path is outside ALLOWED_DIR, else None."""
+    if not target_path.is_relative_to(ALLOWED_DIR):
+        return f"Error: Access denied. Cannot access files outside {ALLOWED_DIR}."
+    return None
+
+
 def read_file(file_path: str) -> str:
     """Reads the content of a file and returns it as a string.
 
     Args:
         file_path: The relative or absolute path to the file to be read.
     """
+    target_path = Path(file_path).resolve()
+
+    err = _check_allowed(target_path)
+    if err:
+        return err
+    if not target_path.exists():
+        return f"Error: File '{file_path}' not found."
+
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return f.read()
+        return target_path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return f"Error: The file at {file_path} was not found."
     except Exception as e:
@@ -18,56 +35,57 @@ def read_file(file_path: str) -> str:
 
 def create_file(name: str, content: str) -> str:
     """Create a file with the given name and content."""
-    dest_path = Path(name)
-    if dest_path.exists():
+    target_path = Path(name).resolve()
+
+    err = _check_allowed(target_path)
+    if err:
+        return err
+    if target_path.exists():
         return "Error: File already exists."
+
     try:
-        dest_path.write_text(content, encoding="utf-8")
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
     except Exception as exc:
         return f"Error: {exc!r}"
+
     return "File created."
 
 
 def edit_file(name: str, content: str, mode: str = "overwrite") -> str:
-    """Edit an existing file mode = "overwrite" or "append"."""
-    dest_path = Path(name)
+    """Edit an existing file. mode = "overwrite" or "append"."""
+    target_path = Path(name).resolve()
 
-    if not dest_path.exists():
-        return "Error: File does not exist."
+    err = _check_allowed(target_path)
+    if err:
+        return err
+    if not target_path.exists():
+        return f"Error: File '{name}' not found."
+    if mode not in ("overwrite", "append"):
+        return f"Error: Invalid mode '{mode}'. Use 'overwrite' or 'append'."
 
     try:
         if mode == "append":
-            with dest_path.open("a", encoding="utf-8") as f:
+            with target_path.open("a", encoding="utf-8") as f:
                 f.write(content)
-        elif mode == "overwrite":
-            dest_path.write_text(content, encoding="utf-8")
         else:
-            return f"Error: Invalid mode '{mode}'. Use 'overwrite' or 'append'."
+            target_path.write_text(content, encoding="utf-8")
     except Exception as exc:
         return f"Error: {exc!r}"
 
     return f"File updated ({mode} mode)."
 
-# skills/file_io.py
-
-
-ALLOWED_DIR = Path("workspace").resolve()
-
 
 def delete_file(file_path: str) -> str:
-    """Deletes the specified file inside the workspace ."""
+    """Deletes the specified file inside the workspace."""
     target_path = Path(file_path).resolve()
 
-    # Directory restriction check
-    if not target_path.is_relative_to(ALLOWED_DIR):
-        return (
-            f"Error: Access denied. Cannot delete files outside {ALLOWED_DIR}."
-        )
-
+    err = _check_allowed(target_path)
+    if err:
+        return err
     if not target_path.exists():
         return f"Error: File '{file_path}' not found."
 
-    # Intercept with Typer user confirmation prompt
     confirm = typer.confirm(
         f"\n⚠️  [APPROVAL NEEDED] Agent wants to DELETE file: '{file_path}'. Allow?"
     )
