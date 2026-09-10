@@ -10,7 +10,7 @@ todo
 - move
 
 ## directory tools
-- pwd - print working directory
-- ls list directories or files 
-- mkdir - create a new directory 
-- rmdir
+- pwd 
+- ls 
+- mkdir 
+- rmdir 

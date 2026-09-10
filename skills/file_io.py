@@ -2,12 +2,12 @@ from pathlib import Path
 import shutil
 import typer
 
-from sandbox import ALLOWED_DIR, check_path_allowed
+from .sandbox import ALLOWED_DIR, check_path_allowed
 
 
 def read_file(file_path: str) -> str:
-    """Reads and returns the text content of a file at the given relative path."""
-    target_path = Path(file_path).resolve()
+    """Reads and returns the text content of a file. file_path e.g. "notes/todo.txt"."""
+    target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
     if error:
@@ -24,8 +24,8 @@ def read_file(file_path: str) -> str:
 
 
 def create_file(file_path: str, content: str) -> str:
-    """Creates a new file with text content at a relative path. Auto-creates parent directories. Fails if file already exists."""
-    target_path = Path(file_path).resolve()
+    """Creates a new file with content. Fails if it already exists. Auto-creates parent dirs."""
+    target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
     if error:
@@ -43,8 +43,8 @@ def create_file(file_path: str, content: str) -> str:
 
 
 def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
-    """Edits an existing file at a relative path. 'mode' can be 'overwrite' (replace all) or 'append' (add to end). Fails if file is missing."""
-    target_path = Path(file_path).resolve()
+    """Edits an existing file. mode: "overwrite" (default) or "append". Fails if file is missing."""
+    target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
     if error:
@@ -67,8 +67,8 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
 
 
 def delete_file(file_path: str) -> str:
-    """Deletes a file at the given relative path. Prompts the user for approval before execution."""
-    target_path = Path(file_path).resolve()
+    """Deletes a file after user approval."""
+    target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
     if error:
@@ -90,9 +90,9 @@ def delete_file(file_path: str) -> str:
 
 
 def rename_file(file_path: str, new_file_path: str) -> str:
-    """Renames/moves a file to a new relative path. Auto-creates parent directories. Fails if destination exists."""
-    source_path = Path(file_path).resolve()
-    dest_path = Path(new_file_path).resolve()
+    """Renames or moves a file to a new path. Fails if destination exists. Auto-creates parent dirs."""
+    source_path = (ALLOWED_DIR / file_path).resolve()
+    dest_path = (ALLOWED_DIR / new_file_path).resolve()
 
     error = check_path_allowed(source_path) or check_path_allowed(dest_path)
     if error:
@@ -110,10 +110,11 @@ def rename_file(file_path: str, new_file_path: str) -> str:
 
     return f"File renamed: {file_path} -> {new_file_path}"
 
+
 def copy_file(file_path: str, new_file_path: str) -> str:
-    """Copies a file to a new relative path, leaving the original. Auto-creates parent directories. Fails if destination exists."""
-    source_path = Path(file_path).resolve()
-    dest_path = Path(new_file_path).resolve()
+    """Copies a file to a new path, leaving the original. Fails if destination exists. Auto-creates parent dirs."""
+    source_path = (ALLOWED_DIR / file_path).resolve()
+    dest_path = (ALLOWED_DIR / new_file_path).resolve()
 
     error = check_path_allowed(source_path) or check_path_allowed(dest_path)
     if error:

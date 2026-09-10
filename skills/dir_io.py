@@ -1,30 +1,17 @@
 from pathlib import Path
 import typer
 
-from sandbox import ALLOWED_DIR, check_path_allowed
+from .sandbox import ALLOWED_DIR, check_path_allowed
 
 
 def pwd() -> str:
-    """Returns the current working directory (the allowed workspace root).
-
-    Returns:
-        The absolute path of the workspace directory.
-    """
+    """Returns the absolute path of the current working directory (workspace root)."""
     return str(ALLOWED_DIR)
 
 
 def ls(dir_path: str = ".") -> str:
-    """Lists the files and subdirectories inside a directory.
-
-    Args:
-        dir_path: Relative path to the directory to list, e.g. "notes" or "."
-            for the workspace root. Defaults to ".".
-
-    Returns:
-        A newline-separated list of entry names (directories marked with a
-        trailing "/"), or an error message string if listing failed.
-    """
-    target_path = Path(dir_path).resolve()
+    """Lists files and directories. dir_path e.g. "notes" or "." (default). Directories end with '/'. Not recursive — call ls again on subdirectories to see contents."""
+    target_path = (ALLOWED_DIR / dir_path).resolve()
 
     error = check_path_allowed(target_path)
     if error:
@@ -48,15 +35,8 @@ def ls(dir_path: str = ".") -> str:
 
 
 def mkdir(dir_path: str) -> str:
-    """Creates a new directory, including any missing parent directories.
-
-    Args:
-        dir_path: Relative path of the directory to create, e.g. "notes/archive".
-
-    Returns:
-        A success message, or an error message string if creation failed.
-    """
-    target_path = Path(dir_path).resolve()
+    """Creates a new directory. dir_path e.g. "notes/archive". Auto-creates parent directories. Fails if target already exists."""
+    target_path = (ALLOWED_DIR / dir_path).resolve()
 
     error = check_path_allowed(target_path)
     if error:
@@ -73,16 +53,8 @@ def mkdir(dir_path: str) -> str:
 
 
 def rmdir(dir_path: str) -> str:
-    """Deletes an empty directory, after asking the user for approval.
-
-    Args:
-        dir_path: Relative path of the directory to delete, e.g. "notes/archive".
-            The directory must be empty.
-
-    Returns:
-        A success message, a cancellation message, or an error message string.
-    """
-    target_path = Path(dir_path).resolve()
+    """Deletes an empty directory after user approval. dir_path e.g. "notes/archive". Fails if not empty or is workspace root."""
+    target_path = (ALLOWED_DIR / dir_path).resolve()
 
     error = check_path_allowed(target_path)
     if error:

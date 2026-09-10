@@ -1,0 +1,3 @@
+This is file 1 in folder 2\n</parameter>
+<parameter=file_path>
+./folder2/file_c.txt
