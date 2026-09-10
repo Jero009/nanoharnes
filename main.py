@@ -72,14 +72,14 @@ def chat():
             if user_input.lower() == "/bye":
                 console.print("bye :)", style = "cyan")
                 break
-            elif user_input.lower() == "/clear":
+            elif user_input.lower() == "/new":
                 console.clear()
                 console.print(BANNER)
                 chat = lms.Chat(SYSTEM_PROMPT)  # reset chat context
             elif user_input.lower() == "/help":
                 console.print("[bold cyan]Available Commands:[/bold cyan]")
                 console.print("/bye   - Exit the chat")
-                console.print("/clear - Clear the chat and reset context")
+                console.print("/new   - Start a new chat")
                 console.print("/help  - Show this help message")
             else:
                 console.print(f"[red]Unknown command: {user_input}[/red]\n")

@@ -1,1 +1,1 @@
-you are a helful ai agent that can use tools
+you are a helpful ai agent that can use tools
