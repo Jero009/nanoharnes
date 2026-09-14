@@ -5,7 +5,7 @@ import typer
 from openai import OpenAI
 from rich.console import Console
 from pathlib import Path
-from config import API_KEY  # Import the API key from config/__init__.py
+from config import API_KEY, BASE_URL  # Import the API key and base URL from config/__init__.py
 
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
 
@@ -35,7 +35,7 @@ def chat():
     console.print(BANNER)
     try:
     # Connect to LM Studio via standard OpenAI client base_url
-        client = OpenAI(base_url="http://localhost:1234/v1", api_key=API_KEY)  # Use the imported API key
+        client = OpenAI(base_url=BASE_URL, api_key=API_KEY)  # Use the imported API key
 
         # Fetch whatever model is currently loaded in LM Studio
         models_response = client.models.list()
@@ -56,7 +56,7 @@ def chat():
     yolo_mode = False  # Track YOLO state locally
     reasoning_mode = True  # Track reasoning display state locally
 
-    while True:
+    while True: # main chat loop
 
         try:
             user_input = typer.prompt("User").strip() # user input prompt
@@ -67,7 +67,7 @@ def chat():
         if not user_input: # skip loop if user input is empty
             continue    
 
-        if user_input.startswith("/"): # Check for commands
+        elif user_input.startswith("/"): # Check for commands
             cmd = user_input.lower()
             if cmd == "/bye":
                 console.print("bye :)", style="cyan")
@@ -93,10 +93,11 @@ def chat():
                 console.print("/bye   - Exit the chat")
                 console.print("/new   - Start a new chat")
                 console.print("/yolo  - Toggle auto-approval for destructive actions")
+                console.print("/reasoning - Toggle display of reasoning content")
                 console.print("/help  - Show this help message\n")
 
             else:
-                console.print(f"[red]Unknown command: {user_input}[/red]\n")
+                console.print(f"[red]Unknown command: {user_input} | try /help[/red]\n")
 
         else:
             messages.append({"role": "user", "content": user_input})
