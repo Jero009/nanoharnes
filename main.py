@@ -1,14 +1,17 @@
 # 1. IMPORTS
+import json
 import time
 import typer
-import lmstudio as lms
+from openai import OpenAI
 from rich.console import Console
 from pathlib import Path
+from config import API_KEY  # Import the API key from config/__init__.py
 
-from skills import ALL_TOOLS, set_yolo_mode
+from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
 
 app = typer.Typer()
 console = Console()
+
 
 # Imports agent.md
 file_path = Path(__file__).parent / "config" / "agent.md"
@@ -28,47 +31,41 @@ BANNER = r"""
 
 @app.command()
 def chat():
-    def print_fragment(fragment, round_index=0): # Used instead of chat to stream tokens
-        content = getattr(fragment, "content", str(fragment))
-
-        if "__LM_STUDIO_INTERNAL" in content:  # Separate thinking from response
-            console.print("\n", end="", style="dim italic white")  # Thinking
-            return 
-
-        if getattr(fragment, "reasoning_type", None) == "reasoning":  # Response is reasoning
-            console.print(content, end="", style="dim italic white")
-        else:
-            console.print(content, end="", style="bold cyan") # Normal response
-
     console.clear()
-    chat = lms.Chat(SYSTEM_PROMPT)  # Initialize chat context
-
     console.print(BANNER)
-
-    # Establish LM Studio Connection
     try:
-        client = lms.Client("127.0.0.1:1234")
-        model = client.llm.model()
-        context_length = model.get_context_length()
-        model_info = model.get_info()
-        console.print("[bold green]Connected to LM Studio[/bold green] ")
-        console.print(f"(model: {getattr(model_info, 'display_name', 'LM Studio')} | Context Length: {context_length} | Tool Use: {getattr(model_info, 'trainedForToolUse', False)})\n")
-        
+    # Connect to LM Studio via standard OpenAI client base_url
+        client = OpenAI(base_url="http://localhost:1234/v1", api_key=API_KEY)  # Use the imported API key
+
+        # Fetch whatever model is currently loaded in LM Studio
+        models_response = client.models.list()
+
+        model_name = models_response.data[0].id  # curently choses the first model in the list, you can modify this logic to select a specific model if needed
+        if models_response.data is not None and len(models_response.data) > 0:
+            model_name = models_response.data[0].id
+        else:
+            model_name = "local-model"
+
+        console.print(f"[bold green]Connected to client[/bold green]")
+        console.print(f"(Active Model: {model_name})\n")
     except Exception as e:
         console.print(f"[red]Error connecting to server:[/red] {e}")
         return
-
+    
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] # initialize chat messages history
     yolo_mode = False  # Track YOLO state locally
+    reasoning_mode = True  # Track reasoning display state locally
 
     while True:
+
         try:
-            user_input = typer.prompt("User").strip()
+            user_input = typer.prompt("User").strip() # user input prompt
         except (KeyboardInterrupt, typer.Abort):
             console.print("\n\nbye :)", style="cyan")
             break
 
-        if not user_input:
-            continue
+        if not user_input: # skip loop if user input is empty
+            continue    
 
         if user_input.startswith("/"): # Check for commands
             cmd = user_input.lower()
@@ -78,7 +75,7 @@ def chat():
             elif cmd == "/new":
                 console.clear()
                 console.print(BANNER)
-                chat = lms.Chat(SYSTEM_PROMPT)  # Reset chat context
+                messages = [{"role": "system", "content": SYSTEM_PROMPT}] # reset messages history for new chat
                 console.print("[dim]Started a new chat session.[/dim]\n")
             elif cmd == "/yolo":
                 yolo_mode = not yolo_mode
@@ -88,33 +85,128 @@ def chat():
                     console.print("[bold red]---YOLO MODE ENABLED---[/bold red]\n")
                 else:
                     console.print("[bold yellow]---YOLO MODE DISABLED---[/bold yellow]\n")
+            elif cmd == "/reasoning":
+                console.print("[dim]Toggling display of reasoning content.[/dim]\n")
+                reasoning_mode = not reasoning_mode
             elif cmd == "/help":
                 console.print("[bold cyan]Available Commands:[/bold cyan]")
                 console.print("/bye   - Exit the chat")
                 console.print("/new   - Start a new chat")
                 console.print("/yolo  - Toggle auto-approval for destructive actions")
                 console.print("/help  - Show this help message\n")
+
             else:
                 console.print(f"[red]Unknown command: {user_input}[/red]\n")
 
         else:
-            chat.add_user_message(user_input) # User input into streaming chat
-            
-            console.print("[bold blue]Agent:[/bold blue]\n", end="") # Agent start line
+            messages.append({"role": "user", "content": user_input})
+
+            console.print("[bold blue]Agent:[/bold blue]\n", end="")
             start = time.time()
+
             try:
-                model.act(
-                    chat,
-                    ALL_TOOLS,
-                    on_message=chat.append,
-                    on_prediction_fragment=print_fragment,
-                )
+                while True:  # keep looping until the model responds without tool calls
+                    response_stream = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        tools=ALL_TOOLS,
+                        tool_choice="auto",
+                        stream=True
+                    )
+
+                    full_content = ""
+                    full_reasoning = ""
+                    tool_calls_data = {}
+
+                    thinking_started = False
+
+                    for chunk in response_stream:
+                        delta = chunk.choices[0].delta
+                        reasoning = getattr(delta, "reasoning_content", None)
+                        
+                        if reasoning:
+                            if not thinking_started:
+                                if reasoning_mode:
+                                    console.print("[dim italic]Thinking: ", end="")
+                                else:
+                                    console.print("[dim italic]Thinking...[/dim italic]", end="")
+                                    console.print("\n", end="")
+                                thinking_started = True
+
+                            if reasoning_mode:
+                                console.print(reasoning, style="dim italic", end="")
+
+                            full_reasoning += reasoning
+
+
+                        if delta.content:
+                            console.print(delta.content, style="bold cyan", end="")
+                            full_content += delta.content
+
+                        if delta.tool_calls:
+                            for tc in delta.tool_calls:
+                                index = tc.index
+                                if index not in tool_calls_data:
+                                    tool_calls_data[index] = {
+                                        "id": tc.id or "",
+                                        "name": tc.function.name or "",
+                                        "arguments": tc.function.arguments or ""
+                                    }
+                                else:
+                                    if tc.function.name:
+                                        tool_calls_data[index]["name"] += tc.function.name
+                                    if tc.function.arguments:
+                                        tool_calls_data[index]["arguments"] += tc.function.arguments
+
+                    console.print()
+
+                    formatted_tool_calls = [
+                        {
+                            "id": tc["id"],
+                            "type": "function",
+                            "function": {"name": tc["name"], "arguments": tc["arguments"]}
+                        }
+                        for tc in tool_calls_data.values()
+                    ] if tool_calls_data else None
+
+                    messages.append({
+                        "role": "assistant",
+                        "content": full_content if full_content else None,
+                        "reasoning_content": full_reasoning if full_reasoning else None,
+                        "tool_calls": formatted_tool_calls
+                    })
+
+                    if not formatted_tool_calls:
+                        break  # model gave a final answer with no tool calls — stop looping
+
+                    for tool_call in formatted_tool_calls:
+                        func_name = tool_call["function"]["name"]
+                        func_args = json.loads(tool_call["function"]["arguments"])
+
+                        console.print(f"\n[dim italic]Executing tool: {func_name}({func_args})[/dim italic]")
+
+                        if func_name in TOOL_MAP:
+                            try:
+                                tool_result = TOOL_MAP[func_name](**func_args)
+                            except Exception as tool_err:
+                                tool_result = f"Error executing tool: {tool_err}"
+                        else:
+                            tool_result = f"Error: Tool {func_name} not found."
+
+                        console.print(f"[dim italic]Result: {tool_result}[/dim italic]\n")
+
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call["id"],
+                            "content": str(tool_result)
+                        })
+                    # loop again — model gets to see the tool results and respond
+
             except Exception as e:
                 console.print(f"\n[red]Execution error:[/red] {e}")
 
-            elapsed = time.time() - start 
-            console.print(f"\n[dim]Response time: {elapsed:.2f} seconds[/dim]\n") # Output time
-
+            elapsed = time.time() - start
+            console.print(f"\n[dim]Response time: {elapsed:.2f} seconds[/dim]\n")
 
 # 4. ENTRYPOINT
 if __name__ == "__main__":

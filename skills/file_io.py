@@ -31,8 +31,8 @@ def read_file(file_path: str) -> str:
         return f"Error reading file: {e}"
 
 
-def create_file(file_path: str, content: str) -> str:
-    """Creates a new file with content. Fails if it already exists. Auto-creates parent dirs."""
+def create_file(file_path: str, content: str = "") -> str:
+    """Creates a new file with content or without. Fails if it already exists. Auto-creates parent dirs."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
