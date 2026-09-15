@@ -2,7 +2,7 @@ import textwrap
 from pathlib import Path
 from openai import OpenAI
 from config import API_KEY, BASE_URL
-from config.sandbox import ALLOWED_DIR, check_path_allowed, MAX_FILE_SIZE_BYTES
+from config.sandbox import ALLOWED_DIR, check_path_allowed, MAX_FILE_SIZE_BYTES,CONTEXT_LENGTH
 
 # Dedicated client for isolated sub-tasks
 client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
