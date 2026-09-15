@@ -142,3 +142,37 @@ def copy_file(file_path: str, new_file_path: str) -> str:
         return f"Error: {exc!r}"
 
     return f"File copied: {file_path} -> {new_file_path}"
+
+
+def get_file_length(file_path: str) -> str:
+    """Returns the line count and size of a file without loading its full content into context."""
+    target_path = (ALLOWED_DIR / file_path).resolve()
+
+    error = check_path_allowed(target_path)
+    if error:
+        return error
+    if not target_path.exists():
+        return f"Error: File '{file_path}' not found."
+    if not target_path.is_file():
+        return f"Error: '{file_path}' is not a file."
+
+    try:
+        size_bytes = target_path.stat().st_size
+
+        # Stream lines efficiently without loading the whole file into RAM
+        line_count = 0
+        with target_path.open("r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line_count += 1
+
+        # Format human-readable size
+        if size_bytes < 1024:
+            size_str = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            size_str = f"{size_bytes / 1024:.1f} KB"
+        else:
+            size_str = f"{size_bytes / (1024 * 1024):.2f} MB"
+
+        return f"File '{file_path}': {line_count} lines ({size_str})."
+    except Exception as exc:
+        return f"Error: {exc!r}"

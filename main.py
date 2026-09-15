@@ -40,7 +40,8 @@ def chat():
         # Fetch whatever model is currently loaded in LM Studio
         models_response = client.models.list()
 
-        model_name = models_response.data[0].id  # curently choses the first model in the list, you can modify this logic to select a specific model if needed
+        model_name = models_response.data[0].id
+        print(models_response.data[1].id)  # curently choses the first model in the list, you can modify this logic to select a specific model if needed
         if models_response.data is not None and len(models_response.data) > 0:
             model_name = models_response.data[0].id
         else:
@@ -128,14 +129,14 @@ def chat():
                         if reasoning:
                             if not thinking_started:
                                 if reasoning_mode:
-                                    console.print("[dim italic]Thinking: ", end="")
+                                    console.print("[dim italic]Thinking: \n", end="")
                                 else:
-                                    console.print("[dim italic]Thinking...[/dim italic]", end="")
+                                    console.print("[dim italic]Thinking...[/dim italic]\n", end="")
                                     console.print("\n", end="")
                                 thinking_started = True
 
                             if reasoning_mode:
-                                console.print(reasoning, style="dim italic", end="")
+                                console.print(reasoning, style="dim italic\n", end="")
 
                             full_reasoning += reasoning
 
