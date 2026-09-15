@@ -62,7 +62,6 @@ def chat():
         models_response = client.models.list()
 
         model_name = models_response.data[0].id
-        print(models_response.data[1].id)  # curently choses the first model in the list, you can modify this logic to select a specific model if needed
         if models_response.data is not None and len(models_response.data) > 0:
             model_name = models_response.data[0].id
         else:
@@ -73,7 +72,6 @@ def chat():
     except Exception as e:
         console.print(f"[red]Error connecting to server:[/red] {e}")
         return
-    message_count = 0
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] # initialize chat messages history
     yolo_mode = False  # Track YOLO state locally
     reasoning_mode = True  # Track reasoning display state locally
@@ -99,7 +97,6 @@ def chat():
             elif cmd == "/new":
                 console.clear()
                 console.print(BANNER)
-                message_count = 0
                 messages = [{"role": "system", "content": SYSTEM_PROMPT}] # reset messages history for new chat
                 console.print("[dim]Started a new chat session.[/dim]\n")
             elif cmd == "/yolo":
@@ -134,13 +131,19 @@ def chat():
             start = time.time()
 
             try:
+                last_call_signature = None  # tack the last tool call signature to detect repetition loops
                 while True:  # keep looping until the model responds without tool calls
                     response_stream = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
                         tools=ALL_TOOLS,
                         tool_choice="auto",
-                        stream=True
+                        stream=True,
+                        # --- FIXES FOR REPETITION LOOPS ---
+                        temperature=0.6,          # 0.6 - 0.7 prevents rigid deterministic loops
+                        presence_penalty=0.3,     # Penalizes words the model has already used
+                        frequency_penalty=0.3,    # Discourages repeating the exact same phrases
+                        max_tokens=2048           # HARD CAP: stops it from streaming indefinitely
                     )
 
                     full_content = ""
@@ -201,7 +204,7 @@ def chat():
                     messages.append({
                         "role": "assistant",
                         "content": full_content if full_content else None,
-                        "reasoning_content": full_reasoning if full_reasoning else None,
+                        "reasoning_content": full_reasoning if full_reasoning else None,  #debationg if i shuld include reasoning content in the message history or not
                         "tool_calls": formatted_tool_calls
                     })
 
@@ -212,16 +215,26 @@ def chat():
                         func_name = tool_call["function"]["name"]
                         func_args = json.loads(tool_call["function"]["arguments"])
 
-                        console.print(f"\n[dim italic]Executing tool: {func_name}({func_args})[/dim italic]")
+                        call_signature = f"{func_name}:{json.dumps(func_args, sort_keys=True)}"
 
-                        if func_name in TOOL_MAP:
-                            try:
-                                tool_result = TOOL_MAP[func_name](**func_args)
-                            except Exception as tool_err:
-                                tool_result = f"Error executing tool: {tool_err}"
+                        if call_signature == last_call_signature:
+                            console.print(f"\n[bold yellow]Loop detected: Repeated call to '{func_name}'. Intercepting...[/bold yellow]")
+                            tool_result = (
+                                f"Error: You called '{func_name}' with identical arguments on the previous turn. "
+                                "This action has already succeeded. Do NOT repeat it. "
+                                "Proceed to the next task or give your final answer to the user."
+                            )
                         else:
-                            tool_result = f"Error: Tool {func_name} not found."
+                            last_call_signature = call_signature
+                            console.print(f"\n[dim italic]Executing tool: {func_name}({func_args})[/dim italic]")
 
+                            if func_name in TOOL_MAP:
+                                try:
+                                    tool_result = TOOL_MAP[func_name](**func_args)
+                                except Exception as tool_err:
+                                    tool_result = f"Error executing tool: {tool_err}"
+                            else:
+                                tool_result = f"Error: Tool {func_name} not found."
                         console.print(f"[dim italic]Result: {tool_result}[/dim italic]\n")
 
                         messages.append({
