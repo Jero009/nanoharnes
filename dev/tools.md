@@ -5,7 +5,7 @@
 - delete file -require acept or yolo
 - rename file 
 
-todo 
+## todo 
 - copy 
 - move
 

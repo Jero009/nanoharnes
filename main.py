@@ -29,6 +29,27 @@ BANNER = r"""
 [dim]           Local Minimalist Agent Harness           [/dim]
 """
 
+def trim_to_window(messages: list, max_messages: int = 15) -> list:  
+    """Keeps the system prompt and the most recent max_messages safely."""
+    if len(messages) <= max_messages:
+        return messages
+
+    system_prompt = messages[0]
+    tail = messages[-(max_messages - 1):]
+
+    # SAFEGUARD: Never start the tail with a naked tool response or unfulfilled tool call
+    while tail and tail[0].get("role") == "tool":
+        tail.pop(0)
+    while tail and tail[0].get("role") == "assistant" and tail[0].get("tool_calls"):
+        if len(tail) < 2 or tail[1].get("role") != "tool":
+            tail.pop(0)
+        else:
+            break
+
+    return [system_prompt] + tail
+
+
+
 @app.command()
 def chat():
     console.clear()
@@ -52,7 +73,7 @@ def chat():
     except Exception as e:
         console.print(f"[red]Error connecting to server:[/red] {e}")
         return
-    
+    message_count = 0
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] # initialize chat messages history
     yolo_mode = False  # Track YOLO state locally
     reasoning_mode = True  # Track reasoning display state locally
@@ -60,7 +81,9 @@ def chat():
     while True: # main chat loop
 
         try:
+            console.print(f"[dim]Message count: {len(messages)}[/dim]")
             user_input = typer.prompt("User").strip() # user input prompt
+            
         except (KeyboardInterrupt, typer.Abort):
             console.print("\n\nbye :)", style="cyan")
             break
@@ -76,6 +99,7 @@ def chat():
             elif cmd == "/new":
                 console.clear()
                 console.print(BANNER)
+                message_count = 0
                 messages = [{"role": "system", "content": SYSTEM_PROMPT}] # reset messages history for new chat
                 console.print("[dim]Started a new chat session.[/dim]\n")
             elif cmd == "/yolo":
@@ -101,8 +125,11 @@ def chat():
                 console.print(f"[red]Unknown command: {user_input} | try /help[/red]\n")
 
         else:
-            messages.append({"role": "user", "content": user_input})
+            # Check actual message length and trim if it exceeds 15
+            if len(messages) > 15:
+                messages = trim_to_window(messages, max_messages=15)
 
+            messages.append({"role": "user", "content": user_input})
             console.print("[bold blue]Agent:[/bold blue]\n", end="")
             start = time.time()
 

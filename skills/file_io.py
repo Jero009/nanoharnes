@@ -3,7 +3,7 @@ import os
 import shutil
 import typer
 
-from .sandbox import ALLOWED_DIR, check_path_allowed
+from config.sandbox import ALLOWED_DIR, check_path_allowed, MAX_FILE_SIZE_BYTES
 
 # Global safety switch
 YOLO_MODE = False
@@ -13,8 +13,11 @@ def set_yolo_mode(enabled: bool):
     YOLO_MODE = enabled
 
 
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_BYTES  
+
+
 def read_file(file_path: str) -> str:
-    """Reads and returns the text content of a file. file_path e.g. "notes/todo.txt"."""
+    """Reads and returns the text content of a file. Fails if the file is larger than 10 KB (use summarize_file instead)."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -22,14 +25,25 @@ def read_file(file_path: str) -> str:
         return error
     if not target_path.exists():
         return f"Error: File '{file_path}' not found."
+    if not target_path.is_file():
+        return f"Error: '{file_path}' is not a file."
 
     try:
-        return target_path.read_text(encoding="utf-8")
+        # 1. Check size first (instant OS check, 0 RAM used)
+        file_size = target_path.stat().st_size
+        if file_size > MAX_FILE_SIZE_BYTES:
+            return f"Error: File is too large ({file_size:,} bytes). Use 'summarize_file' instead."
+
+        # 2. Only read if the size passed the check
+        return target_path.read_text(encoding="utf-8", errors="ignore")
+
     except FileNotFoundError:
         return f"Error: The file at {file_path} was not found."
     except Exception as e:
         return f"Error reading file: {e}"
 
+
+    
 
 def create_file(file_path: str, content: str = "") -> str:
     """Creates a new file with content or without. Fails if it already exists. Auto-creates parent dirs."""

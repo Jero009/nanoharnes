@@ -2,7 +2,7 @@ import textwrap
 from pathlib import Path
 from openai import OpenAI
 from config import API_KEY, BASE_URL
-from .sandbox import ALLOWED_DIR, check_path_allowed
+from config.sandbox import ALLOWED_DIR, check_path_allowed, MAX_FILE_SIZE_BYTES
 
 # Dedicated client for isolated sub-tasks
 client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
@@ -11,8 +11,7 @@ client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
 _CACHED_MODEL: str | None = None
 
 
-def _get_active_model() -> str:
-    """Helper to detect and cache whatever model is currently loaded in LM Studio."""
+def _get_active_model() -> str: #gets the avaible model
     global _CACHED_MODEL
     if _CACHED_MODEL:
         return _CACHED_MODEL
@@ -29,11 +28,8 @@ def _get_active_model() -> str:
 
 def summarize_file(file_path: str, focus: str = "general overview and key points") -> str:
     """
-    Reads a large file safely, analyzes it with an isolated LLM call, and returns a concise summary.
-    Use this instead of read_file when files are long (logs, big code files, documents).
-    
-    :param file_path: Path to the target file.
-    :param focus: Specific question or goal (e.g., 'find error traces', 'list functions', 'summarize conclusions').
+    Reads a large file, analyzes it and returns a concise summary.
+    Use this instead of read_file when files are long.
     """
     target_path = (ALLOWED_DIR / file_path).resolve()
 
@@ -56,11 +52,11 @@ def summarize_file(file_path: str, focus: str = "general overview and key points
         return "File is empty."
 
     # 3. Prevent side-call blowout on huge files (~8k-10k tokens max)
-    MAX_CHARS_FOR_SUMMARY = 40000
-    if len(content) > MAX_CHARS_FOR_SUMMARY:
+    # Adjust as needed for your model's context window
+    if len(content) > CONTEXT_LENGTH:
         content = (
-            content[:MAX_CHARS_FOR_SUMMARY]
-            + f"\n\n...[TRUNCATED: Exceeded {MAX_CHARS_FOR_SUMMARY} characters for summarization]..."
+            content[:CONTEXT_LENGTH]
+            + f"\n\n...[TRUNCATED: Exceeded {CONTEXT_LENGTH} characters for summarization]..."
         )
 
     # 4. Clean unindented prompts with separated system/user roles
@@ -93,7 +89,7 @@ def summarize_file(file_path: str, focus: str = "general overview and key points
         # Handles models that store thoughts separately
         summary = (message.content or "").strip()
 
-        if not summary and hasattr(message, "reasoning_content"):
+        if not summary and hasattr(message, "reasoning_content"): #omit reasoning_content if not present
             summary = message.reasoning_content.strip()
 
         return f"--- SUMMARY OF '{file_path}' ---\n{summary}"
