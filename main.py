@@ -16,27 +16,37 @@ console = Console()
 
 
 config_dir = Path(__file__).parent / "config"
-system_md_path = config_dir / "system.md"
-agent_md_path = config_dir / "agent.md"
+memory_file = Path(__file__).parent / "memory" / "core_memory.md"
 
-# 1. Load System Rules (with safe fallback if missing)
-if system_md_path.exists():
-    system_rules = system_md_path.read_text(encoding="utf-8").strip()
-else:
-    system_rules = "You are a helpful AI assistant equipped with tools."
+def build_system_prompt() -> str:
+    """Combines system rules, user persona, and persistent core memory."""
+    # 1. System rules
+    system_md_path = config_dir / "system.md"
+    system_rules = (
+        system_md_path.read_text(encoding="utf-8").strip()
+        if system_md_path.exists()
+        else "You are a helpful AI assistant equipped with tools."
+    )
 
-# 2. Load User Persona (with fallback if missing OR empty)
-user_agent_persona = ""
-if agent_md_path.exists():
-    user_agent_persona = agent_md_path.read_text(encoding="utf-8").strip()
+    # 2. User persona
+    agent_md_path = config_dir / "agent.md"
+    user_persona = (
+        agent_md_path.read_text(encoding="utf-8").strip()
+        if agent_md_path.exists()
+        else "You are a helpful and precise assistant."
+    )
 
-if not user_agent_persona:
-    user_agent_persona = "You are a helpful and precise assistant."
+    # 3. Core memory
+    core_mem = ""
+    if memory_file.exists():
+        core_mem = memory_file.read_text(encoding="utf-8").strip()
+    if not core_mem:
+        core_mem = "No saved memories yet."
 
-# 3. Combine with a clear section header for the LLM
-SYSTEM_PROMPT = f"""{system_rules} ---### USER INSTRUCTIONS & PERSONA:{user_agent_persona}""".strip()
+    return f"""{system_rules}---### USER INSTRUCTIONS & PERSONA:{user_persona}---### PERMANENT CORE MEMORY:{core_mem}""".strip()
 
-# Note: Added 'r' prefix to handle backslashes as a raw string (fixes SyntaxWarning)
+
+
 BANNER = r"""
 [bold cyan]
   _  _   _   _  _  ___     _   ___ ___ _  _ _____ 
@@ -44,10 +54,8 @@ BANNER = r"""
  | .` |/ _ \| .` | (_) | / _ \ (_ | _|| .` | | |  
  |_|\_/_/ \_\_|\_|\___/ /_/ \_\___|___|_|\_| |_|  
 [/bold cyan]
-[dim]           Local Minimalist Agent Harness           [/dim]
+[dim]           Local Agent Harness           [/dim]
 """
-
-
 
 
 @app.command()
@@ -72,7 +80,7 @@ def chat():
     except Exception as e:
         console.print(f"[red]Error connecting to server:[/red] {e}")
         return
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] # initialize chat messages history
+    messages = [{"role": "system", "content": build_system_prompt()}] # initialize chat messages history
     yolo_mode = False  # Track YOLO state locally
     reasoning_mode = True  # Track reasoning display state locally
     smart_memory_mode = False  # Track memory mode locally
@@ -98,7 +106,7 @@ def chat():
             elif cmd == "/new":
                 console.clear()
                 console.print(BANNER)
-                messages = [{"role": "system", "content": SYSTEM_PROMPT}] # reset messages history for new chat
+                messages = [{"role": "system", "content": build_system_prompt()}] # reset messages history for new chat
                 console.print("[dim]Started a new chat session.[/dim]\n")
             elif cmd == "/yolo":
                 yolo_mode = not yolo_mode
@@ -242,6 +250,9 @@ def chat():
                             if func_name in TOOL_MAP:
                                 try:
                                     tool_result = TOOL_MAP[func_name](**func_args)
+                                    if func_name == "save_memory":
+                                        messages[0]["content"] = build_system_prompt() # refreshes the memory mid convo
+
                                 except Exception as tool_err:
                                     tool_result = f"Error executing tool: {tool_err}"
                             else:
