@@ -5,21 +5,19 @@ import typer
 from openai import OpenAI
 from rich.console import Console
 from pathlib import Path
-from config import API_KEY, BASE_URL  # Import the API key and base URL from config/__init__.py
 
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
 from memory.memory_managment import trim_to_window, trim_with_summary #memory managment functions
-
-
-app = typer.Typer()
-console = Console()
-
+from config import API_KEY, BASE_URL, MAX_MEMORY_CHARS
 
 config_dir = Path(__file__).parent / "config"
 memory_file = Path(__file__).parent / "memory" / "core_memory.md"
 
+app = typer.Typer()
+console = Console()
+
 def build_system_prompt() -> str:
-    """Combines system rules, user persona, and persistent core memory."""
+    """Combines system rules, user persona, and persistent core memory with capacity stats."""
     # 1. System rules
     system_md_path = config_dir / "system.md"
     system_rules = (
@@ -41,9 +39,22 @@ def build_system_prompt() -> str:
     if memory_file.exists():
         core_mem = memory_file.read_text(encoding="utf-8").strip()
     if not core_mem:
-        core_mem = "No saved memories yet."
+        core_mem = "- No saved memories yet."
 
-    return f"""{system_rules}---### USER INSTRUCTIONS & PERSONA:{user_persona}---### PERMANENT CORE MEMORY:{core_mem}""".strip()
+    # Hermes-style capacity calculation
+    char_count = len(core_mem)
+    pct = min(100, int((char_count / MAX_MEMORY_CHARS) * 100))
+    memory_header = f"### PERMANENT CORE MEMORY [{pct}% — {char_count}/{MAX_MEMORY_CHARS:,} chars]:"
+
+    # Clean, readable multi-line layout with proper Markdown spacing
+    return f"""{system_rules}
+            ---
+            ### USER INSTRUCTIONS & PERSONA:
+            {user_persona}
+            ---
+            {memory_header}
+            {core_mem}
+            """.strip()
 
 
 
