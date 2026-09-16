@@ -8,17 +8,33 @@ from pathlib import Path
 from config import API_KEY, BASE_URL  # Import the API key and base URL from config/__init__.py
 
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
-from config.memory_managment import trim_to_window, trim_with_summary #memory managment functions
+from memory.memory_managment import trim_to_window, trim_with_summary #memory managment functions
 
 
 app = typer.Typer()
 console = Console()
 
 
-# Imports agent.md
-file_path = Path(__file__).parent / "config" / "agent.md"
-agent_config = file_path.read_text(encoding="utf-8")
-SYSTEM_PROMPT = agent_config
+config_dir = Path(__file__).parent / "config"
+system_md_path = config_dir / "system.md"
+agent_md_path = config_dir / "agent.md"
+
+# 1. Load System Rules (with safe fallback if missing)
+if system_md_path.exists():
+    system_rules = system_md_path.read_text(encoding="utf-8").strip()
+else:
+    system_rules = "You are a helpful AI assistant equipped with tools."
+
+# 2. Load User Persona (with fallback if missing OR empty)
+user_agent_persona = ""
+if agent_md_path.exists():
+    user_agent_persona = agent_md_path.read_text(encoding="utf-8").strip()
+
+if not user_agent_persona:
+    user_agent_persona = "You are a helpful and precise assistant."
+
+# 3. Combine with a clear section header for the LLM
+SYSTEM_PROMPT = f"""{system_rules} ---### USER INSTRUCTIONS & PERSONA:{user_agent_persona}""".strip()
 
 # Note: Added 'r' prefix to handle backslashes as a raw string (fixes SyntaxWarning)
 BANNER = r"""

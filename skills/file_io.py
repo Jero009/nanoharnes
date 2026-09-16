@@ -16,8 +16,12 @@ def set_yolo_mode(enabled: bool):
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_BYTES  
 
 
+
 def read_file(file_path: str) -> str:
-    """Reads and returns the text content of a file. Fails if the file is larger than 10 KB (use summarize_file instead)."""
+    """
+    Reads and returns the full text content of a file. 
+    Fails if the file is larger than 30 KB (use read_lines or summarize_file instead).
+    """
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -29,12 +33,14 @@ def read_file(file_path: str) -> str:
         return f"Error: '{file_path}' is not a file."
 
     try:
-        # 1. Check size first (instant OS check, 0 RAM used)
+        # Instant OS size check (0 RAM used)
         file_size = target_path.stat().st_size
         if file_size > MAX_FILE_SIZE_BYTES:
-            return f"Error: File is too large ({file_size:,} bytes). Use 'summarize_file' instead."
+            return (
+                f"Error: File is too large ({file_size:,} bytes, limit is {MAX_FILE_SIZE_BYTES:,} bytes). "
+                "Use 'read_lines' to inspect a specific section, or 'summarize_file' to understand it."
+            )
 
-        # 2. Only read if the size passed the check
         return target_path.read_text(encoding="utf-8", errors="ignore")
 
     except FileNotFoundError:
@@ -42,7 +48,43 @@ def read_file(file_path: str) -> str:
     except Exception as e:
         return f"Error reading file: {e}"
 
+def read_lines(file_path: str, start_line: int = 1, line_count: int = 50) -> str: # read specific lines in a file
+    """
+    Reads a specific range of lines from a file. 
+    Safe to use on files of ANY size (including massive logs or scripts).
+    """
+    target_path = (ALLOWED_DIR / file_path).resolve()
 
+    error = check_path_allowed(target_path)
+    if error:
+        return error
+    if not target_path.exists():
+        return f"Error: File '{file_path}' not found."
+    if not target_path.is_file():
+        return f"Error: '{file_path}' is not a file."
+
+    start_line = max(1, start_line)
+    line_count = max(1, line_count)
+    end_line = start_line + line_count - 1
+
+    try:
+        lines = []
+        with target_path.open("r", encoding="utf-8", errors="ignore") as f:
+            for line_no, line in enumerate(f, start=1):
+                if line_no < start_line:
+                    continue
+                if line_no <= end_line:
+                    lines.append(line)
+                else:
+                    break
+
+        if not lines:
+            return f"File '{file_path}' has fewer than {start_line} lines."
+
+        return "".join(lines)
+
+    except Exception as e:
+        return f"Error reading file lines: {e}"
     
 
 def create_file(file_path: str, content: str = "") -> str:

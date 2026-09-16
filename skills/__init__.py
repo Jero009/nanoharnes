@@ -6,8 +6,9 @@ from .file_io import (
     delete_file,
     rename_file,
     copy_file,
-    set_yolo_mode as set_file_yolo,
     get_file_length,
+    set_yolo_mode as set_file_yolo,
+    read_lines, 
 )
 from .dir_io import (
     pwd,
@@ -19,12 +20,17 @@ from .dir_io import (
 from .ai_skills import (
     summarize_file,
 )
+from .shell_io import (
+    execute_command,
+    set_yolo_mode as set_shell_yolo,
+)
 
 
 def set_yolo_mode(enabled: bool):
-    """Globally toggle YOLO mode across all file and directory tools."""
+    """Globally toggle YOLO mode across file, directory, and shell tools."""
     set_file_yolo(enabled)
     set_dir_yolo(enabled)
+    set_shell_yolo(enabled)
 
 
 FILE_FUNCTIONS = [
@@ -35,20 +41,13 @@ FILE_FUNCTIONS = [
     rename_file,
     copy_file,
     get_file_length,
+    read_lines,  
 ]
-DIR_FUNCTIONS = [
-    pwd,
-    ls,
-    mkdir,
-    rmdir,
-]
-AI_FUNCTIONS = [
-    summarize_file,
+DIR_FUNCTIONS = [pwd, ls, mkdir, rmdir]
+AI_FUNCTIONS = [summarize_file]
+SHELL_FUNCTIONS = [execute_command]
 
-]
-
-
-ALL_FUNCTIONS = FILE_FUNCTIONS + DIR_FUNCTIONS + AI_FUNCTIONS
+ALL_FUNCTIONS = FILE_FUNCTIONS + DIR_FUNCTIONS + AI_FUNCTIONS + SHELL_FUNCTIONS
 
 TOOL_MAP = {func.__name__: func for func in ALL_FUNCTIONS}
 
@@ -83,8 +82,9 @@ def function_to_schema(func):
 FILE_TOOLS = [function_to_schema(f) for f in FILE_FUNCTIONS]
 DIR_TOOLS = [function_to_schema(f) for f in DIR_FUNCTIONS]
 AI_TOOLS = [function_to_schema(f) for f in AI_FUNCTIONS]
+SHELL_TOOLS = [function_to_schema(f) for f in SHELL_FUNCTIONS]
 
-ALL_TOOLS = FILE_TOOLS + DIR_TOOLS + AI_TOOLS
+ALL_TOOLS = FILE_TOOLS + DIR_TOOLS + AI_TOOLS + SHELL_TOOLS
 
 __all__ = [
     "read_file",
@@ -99,10 +99,12 @@ __all__ = [
     "mkdir",
     "rmdir",
     "summarize_file",
+    "execute_command",
     "set_yolo_mode",
     "TOOL_MAP",
     "FILE_TOOLS",
     "DIR_TOOLS",
     "AI_TOOLS",
+    "SHELL_TOOLS",
     "ALL_TOOLS",
 ]
