@@ -8,7 +8,7 @@ from pathlib import Path
 
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
 from memory.memory_managment import trim_to_window, trim_with_summary #memory managment functions
-from config import API_KEY, BASE_URL, MAX_MEMORY_CHARS, MAX_TOOL_ROUNDS
+from config import API_KEY, BASE_URL, MAX_MEMORY_CHARS, MAX_TOKENS, MAX_TOOL_ROUNDS
 
 config_dir = Path(__file__).parent / "config"
 memory_file = Path(__file__).parent / "memory" / "core_memory.md"
@@ -179,16 +179,18 @@ def chat():
                         temperature=0.6,          # 0.6 - 0.7 prevents rigid deterministic loops
                         presence_penalty=0.3,     # Penalizes words the model has already used
                         frequency_penalty=0.3,    # Discourages repeating the exact same phrases
-                        max_tokens=2048           # HARD CAP: stops it from streaming indefinitely
+                        max_tokens=MAX_TOKENS      # HARD CAP: stops it from streaming indefinitely
                     )
 
                     full_content = ""
                     full_reasoning = ""
                     tool_calls_data = {}
+                    finish_reason = None
 
                     thinking_started = False
 
                     for chunk in response_stream:
+                        finish_reason = getattr(chunk.choices[0], "finish_reason", None)
                         delta = chunk.choices[0].delta
                         reasoning = getattr(delta, "reasoning_content", None)
                         
@@ -227,6 +229,9 @@ def chat():
                                         tool_calls_data[index]["name"] += tc.function.name
                                     if tc.function.arguments:
                                         tool_calls_data[index]["arguments"] += tc.function.arguments
+
+                    if finish_reason == "length":
+                        console.print("\n[bold yellow]Agent fumbled: response hit the token limit.[/bold yellow]")
 
                     console.print()
 

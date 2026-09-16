@@ -8,6 +8,7 @@ from .settings import (
 	MAX_MEMORY_CHARS,
 	MAX_OUTPUT_CHARS,
 	MAX_TOOL_ROUNDS,
+	MAX_TOKENS,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
 	"MAX_MEMORY_CHARS",
 	"MAX_OUTPUT_CHARS",
 	"MAX_TOOL_ROUNDS",
+	"MAX_TOKENS",
 ]
