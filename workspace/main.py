@@ -5,9 +5,11 @@ import typer
 from openai import OpenAI
 from rich.console import Console
 from pathlib import Path
-from config import API_KEY, BASE_URL  # Import the API key and base URL from config/__init__.py
+from config import API_KEY, BASE_URL, MAX_TOOL_ROUNDS  # Import the API key and base URL from config/__init__.py
 
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
+from main import build_system_prompt
+from memory.memory_managment import trim_to_window as safe_trim_to_window
 
 app = typer.Typer()
 console = Console()
@@ -16,7 +18,7 @@ console = Console()
 # Imports agent.md
 file_path = Path(__file__).parent.parent / "config" / "agent.md"
 agent_config = file_path.read_text(encoding="utf-8")
-SYSTEM_PROMPT = agent_config
+SYSTEM_PROMPT = build_system_prompt()
 
 # Note: Added 'r' prefix to handle backslashes as a raw string (fixes SyntaxWarning)
 BANNER = r"""
@@ -31,22 +33,8 @@ BANNER = r"""
 
 def trim_to_window(messages: list, max_messages: int = 15) -> list:  
     """Keeps the system prompt and the most recent max_messages safely."""
-    if len(messages) <= max_messages:
-        return messages
-
-    system_prompt = messages[0]
-    tail = messages[-(max_messages - 1):]
-
     # SAFEGUARD: Never start the tail with a naked tool response or unfulfilled tool call
-    while tail and tail[0].get("role") == "tool":
-        tail.pop(0)
-    while tail and tail[0].get("role") == "assistant" and tail[0].get("tool_calls"):
-        if len(tail) < 2 or tail[1].get("role") != "tool":
-            tail.pop(0)
-        else:
-            break
-
-    return [system_prompt] + tail
+    return safe_trim_to_window(messages, max_messages)
 
 
 
@@ -97,7 +85,7 @@ def chat():
             elif cmd == "/new":
                 console.clear()
                 console.print(BANNER)
-                messages = [{"role": "system", "content": SYSTEM_PROMPT}] # reset messages history for new chat
+                messages = [{"role": "system", "content": build_system_prompt()}] # reset messages history for new chat
                 console.print("[dim]Started a new chat session.[/dim]\n")
             elif cmd == "/yolo":
                 yolo_mode = not yolo_mode
@@ -132,7 +120,13 @@ def chat():
 
             try:
                 last_call_signature = None  # tack the last tool call signature to detect repetition loops
+                tool_round = 0
                 while True:  # keep looping until the model responds without tool calls
+                    tool_round += 1
+                    if tool_round > MAX_TOOL_ROUNDS:
+                        console.print("\n[bold yellow]Agent fumbled: too many tool calls.[/bold yellow]")
+                        break
+
                     response_stream = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
@@ -185,6 +179,8 @@ def chat():
                                         "arguments": tc.function.arguments or ""
                                     }
                                 else:
+                                    if tc.id:
+                                        tool_calls_data[index]["id"] = tc.id
                                     if tc.function.name:
                                         tool_calls_data[index]["name"] += tc.function.name
                                     if tc.function.arguments:
@@ -237,7 +233,7 @@ def chat():
                         call_signature = f"{func_name}:{json.dumps(func_args, sort_keys=True)}"
 
                         if call_signature == last_call_signature:  # atemts to stop model spiraling
-                            console.print(f"\n[bold yellow]Loop detected: Repeated call to '{func_name}'. Intercepting...[/bold yellow]")
+                            console.print(f"\n[bold yellow]Agent fumbled: repeated tool call '{func_name}'.[/bold yellow]")
                             tool_result = (
                                 f"Error: You called '{func_name}' with identical arguments on the previous turn. "
                                 "This action has already succeeded. Do NOT repeat it. "

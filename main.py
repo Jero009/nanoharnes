@@ -8,7 +8,7 @@ from pathlib import Path
 
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
 from memory.memory_managment import trim_to_window, trim_with_summary #memory managment functions
-from config import API_KEY, BASE_URL, MAX_MEMORY_CHARS
+from config import API_KEY, BASE_URL, MAX_MEMORY_CHARS, MAX_TOOL_ROUNDS
 
 config_dir = Path(__file__).parent / "config"
 memory_file = Path(__file__).parent / "memory" / "core_memory.md"
@@ -162,7 +162,13 @@ def chat():
 
             try:
                 last_call_signature = None  # tack the last tool call signature to detect repetition loops
+                tool_round = 0
                 while True:  # keep looping until the model responds without tool calls
+                    tool_round += 1
+                    if tool_round > MAX_TOOL_ROUNDS:
+                        console.print("\n[bold yellow]Agent fumbled: too many tool calls.[/bold yellow]")
+                        break
+
                     response_stream = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
@@ -215,6 +221,8 @@ def chat():
                                         "arguments": tc.function.arguments or ""
                                     }
                                 else:
+                                    if tc.id:
+                                        tool_calls_data[index]["id"] = tc.id
                                     if tc.function.name:
                                         tool_calls_data[index]["name"] += tc.function.name
                                     if tc.function.arguments:
@@ -264,7 +272,7 @@ def chat():
                         call_signature = f"{func_name}:{json.dumps(func_args, sort_keys=True)}"
 
                         if call_signature == last_call_signature:  # atemts to stop model spiraling
-                            console.print(f"\n[bold yellow]Loop detected: Repeated call to '{func_name}'. Intercepting...[/bold yellow]")
+                            console.print(f"\n[bold yellow]Agent fumbled: repeated tool call '{func_name}'.[/bold yellow]")
                             tool_result = (
                                 f"Error: You called '{func_name}' with identical arguments on the previous turn. "
                                 "This action has already succeeded. Do NOT repeat it. "

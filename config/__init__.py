@@ -7,6 +7,7 @@ from .settings import (
 	MAX_FILE_SIZE_BYTES,
 	MAX_MEMORY_CHARS,
 	MAX_OUTPUT_CHARS,
+	MAX_TOOL_ROUNDS,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
 	"MAX_FILE_SIZE_BYTES",
 	"MAX_MEMORY_CHARS",
 	"MAX_OUTPUT_CHARS",
+	"MAX_TOOL_ROUNDS",
 ]
