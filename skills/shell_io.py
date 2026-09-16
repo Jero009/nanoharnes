@@ -1,11 +1,10 @@
 import subprocess
 import shutil
 import typer
-from config.sandbox import ALLOWED_DIR
+from config import ALLOWED_DIR, MAX_OUTPUT_CHARS
 
 # Global safety switch
 YOLO_MODE = False
-MAX_OUTPUT_CHARS = 4000
 
 
 def set_yolo_mode(enabled: bool):

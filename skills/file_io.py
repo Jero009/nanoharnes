@@ -3,7 +3,8 @@ import os
 import shutil
 import typer
 
-from config.sandbox import ALLOWED_DIR, check_path_allowed, MAX_FILE_SIZE_BYTES
+from config import ALLOWED_DIR, MAX_FILE_SIZE_BYTES
+from config.sandbox import check_path_allowed
 
 # Global safety switch
 YOLO_MODE = False
@@ -11,10 +12,6 @@ YOLO_MODE = False
 def set_yolo_mode(enabled: bool):
     global YOLO_MODE
     YOLO_MODE = enabled
-
-
-MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_BYTES  
-
 
 
 def read_file(file_path: str) -> str:

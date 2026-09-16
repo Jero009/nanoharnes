@@ -80,8 +80,8 @@ def chat():
         # Fetch whatever model is currently loaded in LM Studio
         models_response = client.models.list()
 
-        model_name = models_response.data[0].id
-        if models_response.data is not None and len(models_response.data) > 0:
+        # Use a fallback when the server has no loaded model.
+        if models_response.data:
             model_name = models_response.data[0].id
         else:
             model_name = "local-model"

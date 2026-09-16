@@ -1,7 +1,8 @@
 from pathlib import Path
 import typer
 
-from config.sandbox import ALLOWED_DIR, check_path_allowed, MAX_FILE_SIZE_BYTES
+from config import ALLOWED_DIR
+from config.sandbox import check_path_allowed
 
 # Global safety switch
 YOLO_MODE = False
