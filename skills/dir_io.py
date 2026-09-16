@@ -12,12 +12,12 @@ def set_yolo_mode(enabled: bool):
 
 
 def pwd() -> str:
-    """Returns the absolute path of the current working directory (workspace root)."""
+    """Show the workspace path."""
     return str(ALLOWED_DIR)
 
 
 def ls(dir_path: str = ".") -> str:
-    """Lists files and directories. dir_path e.g. "notes" or "." (default). Directories end with '/'. Not recursive — call ls again on subdirectories to see contents."""
+    """List one directory. The result is not recursive."""
     target_path = (ALLOWED_DIR / dir_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -42,7 +42,7 @@ def ls(dir_path: str = ".") -> str:
 
 
 def mkdir(dir_path: str) -> str:
-    """Creates a new directory. dir_path e.g. "notes/archive". Auto-creates parent directories. Fails if target already exists."""
+    """Create a directory and its parent folders."""
     target_path = (ALLOWED_DIR / dir_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -60,7 +60,7 @@ def mkdir(dir_path: str) -> str:
 
 
 def rmdir(dir_path: str) -> str:
-    """Deletes an empty directory after user approval (bypassed if YOLO_MODE is True). dir_path e.g. "notes/archive". Fails if not empty or is workspace root."""
+    """Delete an empty directory. Asks for approval unless YOLO mode is on."""
     target_path = (ALLOWED_DIR / dir_path).resolve()
 
     error = check_path_allowed(target_path)

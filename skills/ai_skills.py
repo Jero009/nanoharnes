@@ -27,10 +27,7 @@ def _get_active_model() -> str: #gets the avaible model
 
 
 def summarize_file(file_path: str, focus: str = "general overview and key points") -> str:
-    """
-    Reads a large file, analyzes it and returns a concise summary.
-    Use this instead of read_file when files are long.
-    """
+    """Summarize a large text file. Use focus to guide the summary."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     # 1. Sandbox security checks

@@ -1,4 +1,5 @@
 import subprocess
+import shutil
 import typer
 from config.sandbox import ALLOWED_DIR
 
@@ -14,9 +15,11 @@ def set_yolo_mode(enabled: bool):
 
 
 def execute_command(command: str) -> str:
-    """
-    Executes a shell command inside the sandboxed workspace. 
-    """
+    """Run a shell command in the isolated workspace. Network is disabled."""
+    sandbox = shutil.which("bwrap")
+    if sandbox is None:
+        return "Error: bubblewrap is required to run shell commands safely."
+
     # 1. Approval check (bypassed if YOLO is enabled)
     if not YOLO_MODE:
         confirm = typer.confirm(
@@ -26,11 +29,30 @@ def execute_command(command: str) -> str:
             return "Action canceled: User denied command execution."
 
     try:
-        # 2. Run inside the sandboxed directory with a 30-second timeout
+        # 2. Give the process a temporary root and expose only the workspace
+        # as writable. Network access is disabled for shell commands.
+        sandbox_command = [
+            sandbox,
+            "--die-with-parent",
+            "--new-session",
+            "--unshare-pid",
+            "--unshare-net",
+            "--ro-bind", "/usr", "/usr",
+            "--ro-bind", "/bin", "/bin",
+            "--ro-bind", "/lib", "/lib",
+            "--ro-bind", "/lib64", "/lib64",
+            "--dev", "/dev",
+            "--proc", "/proc",
+            "--tmpfs", "/tmp",
+            "--tmpfs", "/etc",
+            "--bind", str(ALLOWED_DIR), "/workspace",
+            "--chdir", "/workspace",
+            "--", "/bin/sh", "-c", command,
+        ]
+
         result = subprocess.run(
-            command,
-            shell=True,
-            cwd=ALLOWED_DIR,
+            sandbox_command,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=30,

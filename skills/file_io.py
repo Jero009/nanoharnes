@@ -18,10 +18,7 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_BYTES
 
 
 def read_file(file_path: str) -> str:
-    """
-    Reads and returns the full text content of a file. 
-    Fails if the file is larger than 30 KB (use read_lines or summarize_file instead).
-    """
+    """Read a small text file. Use read_lines for large files."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -49,10 +46,7 @@ def read_file(file_path: str) -> str:
         return f"Error reading file: {e}"
 
 def read_lines(file_path: str, start_line: int = 1, line_count: int = 50) -> str: # read specific lines in a file
-    """
-    Reads a specific range of lines from a file. 
-    Safe to use on files of ANY size (including massive logs or scripts).
-    """
+    """Read selected lines from a text file."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -88,7 +82,7 @@ def read_lines(file_path: str, start_line: int = 1, line_count: int = 50) -> str
     
 
 def create_file(file_path: str, content: str = "") -> str:
-    """Creates a new file with content or without. Fails if it already exists. Auto-creates parent dirs."""
+    """Create a new file. Parent folders are created automatically."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -107,7 +101,7 @@ def create_file(file_path: str, content: str = "") -> str:
 
 
 def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
-    """Edits an existing file. mode: "overwrite" (default) or "append". Fails if file is missing."""
+    """Replace or append to an existing file."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -131,7 +125,7 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
 
 
 def delete_file(file_path: str) -> str:
-    """Deletes a file after user approval (bypassed if YOLO_MODE is True)."""
+    """Delete a file. Asks for approval unless YOLO mode is on."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -155,7 +149,7 @@ def delete_file(file_path: str) -> str:
 
 
 def rename_file(file_path: str, new_file_path: str) -> str:
-    """Renames or moves a file to a new path. Fails if destination exists. Auto-creates parent dirs."""
+    """Rename or move a file. The destination must not exist."""
     source_path = (ALLOWED_DIR / file_path).resolve()
     dest_path = (ALLOWED_DIR / new_file_path).resolve()
 
@@ -177,7 +171,7 @@ def rename_file(file_path: str, new_file_path: str) -> str:
 
 
 def copy_file(file_path: str, new_file_path: str) -> str:
-    """Copies a file to a new path, leaving the original. Fails if destination exists. Auto-creates parent dirs."""
+    """Copy a file. The destination must not exist."""
     source_path = (ALLOWED_DIR / file_path).resolve()
     dest_path = (ALLOWED_DIR / new_file_path).resolve()
 
@@ -201,7 +195,7 @@ def copy_file(file_path: str, new_file_path: str) -> str:
 
 
 def get_file_length(file_path: str) -> str:
-    """Returns the line count and size of a file without loading its full content into context."""
+    """Get a file's line count and size."""
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)

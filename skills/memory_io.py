@@ -69,10 +69,7 @@ CONSOLIDATED MEMORY (Markdown bullet points only):"""
 
 
 def save_memory(fact: str) -> str:
-    """
-    Saves an important fact or user preference to permanent memory.
-    Bounded by a hard character limit. Automatically consolidates and compacts when full.
-    """
+    """Save a fact or preference to permanent memory."""
     fact = fact.strip()
     if not fact:
         return "Error: Cannot save an empty memory."
