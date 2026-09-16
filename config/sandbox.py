@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ALLOWED_DIR = Path("workspace").resolve()
+ALLOWED_DIR = (Path(__file__).parent.parent / "workspace").resolve()
 
 CONTEXT_LENGTH = 80000  # Max characters to read from a file for LLM processing
 

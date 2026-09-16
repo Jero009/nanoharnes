@@ -32,10 +32,12 @@ def ls(dir_path: str = ".") -> str:
         entries = sorted(target_path.iterdir(), key=lambda p: p.name)
         if not entries:
             return "(empty directory)"
-        lines = [
-            f"{entry.name}/" if entry.is_dir() else entry.name
-            for entry in entries
-        ]
+        lines = []
+        for entry in entries:
+            if entry.is_dir():
+                lines.append(f"{entry.name}/")
+            else:
+                lines.append(entry.name)
         return "\n".join(lines)
     except Exception as e:
         return f"Error listing directory: {e}"

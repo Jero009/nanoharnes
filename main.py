@@ -222,18 +222,25 @@ def chat():
 
                     console.print()
 
-                    formatted_tool_calls = [
-                        {
-                            "id": tc["id"],
-                            "type": "function",
-                            "function": {"name": tc["name"], "arguments": tc["arguments"]}
-                        }
-                        for tc in tool_calls_data.values()
-                    ] if tool_calls_data else None
+                    if tool_calls_data:
+                        formatted_tool_calls = [
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {"name": tc["name"], "arguments": tc["arguments"]}
+                            }
+                            for tc in tool_calls_data.values()
+                        ]
+                    else:
+                        formatted_tool_calls = None
+
+                    assistant_content = full_content
+                    if not assistant_content:
+                        assistant_content = None
 
                     messages.append({
                         "role": "assistant",
-                        "content": full_content if full_content else None,
+                        "content": assistant_content,
                         #debationg if i shuld include reasoning content in the message history or not
                         "tool_calls": formatted_tool_calls
                     })
@@ -243,7 +250,16 @@ def chat():
 
                     for tool_call in formatted_tool_calls:
                         func_name = tool_call["function"]["name"]
-                        func_args = json.loads(tool_call["function"]["arguments"])
+                        try:
+                            func_args = json.loads(tool_call["function"]["arguments"])
+                        except (TypeError, json.JSONDecodeError) as error:
+                            tool_result = f"Error: Invalid tool arguments ({error})."
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call["id"],
+                                "content": tool_result,
+                            })
+                            continue
 
                         call_signature = f"{func_name}:{json.dumps(func_args, sort_keys=True)}"
 

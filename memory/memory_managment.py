@@ -3,6 +3,33 @@ from rich.console import Console
 console = Console()
 
 
+def _drop_incomplete_prefix(messages: list) -> list:
+    """Remove leading tool messages or incomplete tool-call groups."""
+    while messages:
+        first = messages[0]
+        if first.get("role") == "tool":
+            messages.pop(0)
+            continue
+
+        if first.get("role") == "assistant":
+            tool_calls = first.get("tool_calls")
+        else:
+            tool_calls = None
+        if not tool_calls:
+            break
+
+        call_ids = {call.get("id") for call in tool_calls}
+        result_ids = set()
+        for message in messages[1:]:
+            if message.get("role") != "tool":
+                break
+            result_ids.add(message.get("tool_call_id"))
+        if call_ids.issubset(result_ids):
+            break
+        messages.pop(0)
+    return messages
+
+
 def trim_to_window(messages: list, max_messages: int = 15) -> list:
     """Keeps the system prompt and the most recent max_messages safely."""
     if len(messages) <= max_messages:
@@ -12,13 +39,7 @@ def trim_to_window(messages: list, max_messages: int = 15) -> list:
     tail = messages[-(max_messages - 1):]
 
     # SAFEGUARD: Never start the tail with a naked tool response or unfulfilled tool call
-    while tail and tail[0].get("role") == "tool":
-        tail.pop(0)
-    while tail and tail[0].get("role") == "assistant" and tail[0].get("tool_calls"):
-        if len(tail) < 2 or tail[1].get("role") != "tool":
-            tail.pop(0)
-        else:
-            break
+    tail = _drop_incomplete_prefix(tail)
 
     return [system_prompt] + tail
 
@@ -45,6 +66,10 @@ def trim_with_summary(client, model: str, messages: list, max_messages: int = 15
     # SAFEGUARD: Keep tool results paired with their caller
     while to_keep and to_keep[0].get("role") == "tool":
         to_summarize.append(to_keep.pop(0))
+    if to_summarize and to_summarize[-1].get("tool_calls"):
+        while to_keep and to_keep[0].get("role") == "tool":
+            to_summarize.append(to_keep.pop(0))
+    to_keep = _drop_incomplete_prefix(to_keep)
 
     # Convert messages into readable text for the model
     chat_text = ""

@@ -73,6 +73,9 @@ def save_memory(fact: str) -> str:
     fact = fact.strip()
     if not fact:
         return "Error: Cannot save an empty memory."
+    fact_line = f"- {fact}"
+    if len(fact_line) > MAX_MEMORY_CHARS:
+        return f"Error: Memory fact is too long ({len(fact_line)} chars)."
 
     MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -82,19 +85,23 @@ def save_memory(fact: str) -> str:
     current_content = MEMORY_FILE.read_text(encoding="utf-8").strip()
 
     # Calculate what size would be if we just appended
-    projected_length = len(current_content) + len(f"\n- {fact}")
+    projected_length = len(current_content) + len(fact_line) + 1
 
     # Case 1: Fits comfortably within budget -> simple append
     if projected_length <= MAX_MEMORY_CHARS:
-        with MEMORY_FILE.open("a", encoding="utf-8") as f:
-            f.write(f"- {fact}\n")
-        
-        new_size = len(MEMORY_FILE.read_text(encoding="utf-8"))
+        new_content = f"{current_content}\n{fact_line}"
+        MEMORY_FILE.write_text(new_content + "\n", encoding="utf-8")
+        new_size = len(new_content)
         pct = int((new_size / MAX_MEMORY_CHARS) * 100)
         return f"Saved to memory [{pct}% — {new_size}/{MAX_MEMORY_CHARS} chars]: '{fact}'"
 
     # Case 2: Exceeds limit -> Hermes Consolidation
     consolidated_content = _consolidate_memory(current_content, fact)
+    if len(consolidated_content) > MAX_MEMORY_CHARS:
+        # Keep the new fact and fill the remaining space with older memory.
+        available = MAX_MEMORY_CHARS - len(fact_line) - 1
+        older_content = consolidated_content[:max(0, available)].rsplit("\n", 1)[0]
+        consolidated_content = f"{older_content}\n{fact_line}".strip()
     MEMORY_FILE.write_text(consolidated_content + "\n", encoding="utf-8")
 
     new_size = len(consolidated_content)
