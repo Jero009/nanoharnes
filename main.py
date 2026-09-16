@@ -8,6 +8,8 @@ from pathlib import Path
 from config import API_KEY, BASE_URL  # Import the API key and base URL from config/__init__.py
 
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
+from config.memory_managment import trim_to_window, trim_with_summary #memory managment functions
+
 
 app = typer.Typer()
 console = Console()
@@ -29,24 +31,6 @@ BANNER = r"""
 [dim]           Local Minimalist Agent Harness           [/dim]
 """
 
-def trim_to_window(messages: list, max_messages: int = 15) -> list:  
-    """Keeps the system prompt and the most recent max_messages safely."""
-    if len(messages) <= max_messages:
-        return messages
-
-    system_prompt = messages[0]
-    tail = messages[-(max_messages - 1):]
-
-    # SAFEGUARD: Never start the tail with a naked tool response or unfulfilled tool call
-    while tail and tail[0].get("role") == "tool":
-        tail.pop(0)
-    while tail and tail[0].get("role") == "assistant" and tail[0].get("tool_calls"):
-        if len(tail) < 2 or tail[1].get("role") != "tool":
-            tail.pop(0)
-        else:
-            break
-
-    return [system_prompt] + tail
 
 
 
@@ -75,6 +59,7 @@ def chat():
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] # initialize chat messages history
     yolo_mode = False  # Track YOLO state locally
     reasoning_mode = True  # Track reasoning display state locally
+    smart_memory_mode = False  # Track memory mode locally
 
     while True: # main chat loop
 
@@ -110,12 +95,19 @@ def chat():
             elif cmd == "/reasoning":
                 console.print("[dim]Toggling display of reasoning content.[/dim]\n")
                 reasoning_mode = not reasoning_mode
+            elif cmd == "/memory":
+                smart_memory_mode = not smart_memory_mode
+                if smart_memory_mode:
+                    console.print("[bold green]Memory Mode: SMART SUMMARY (Summarizes old context)[/bold green]\n")
+                else:
+                    console.print("[bold yellow]Memory Mode: FAST TRIM (Drops older turns instantly)[/bold yellow]\n")
             elif cmd == "/help":
                 console.print("[bold cyan]Available Commands:[/bold cyan]")
                 console.print("/bye   - Exit the chat")
                 console.print("/new   - Start a new chat")
                 console.print("/yolo  - Toggle auto-approval for destructive actions")
                 console.print("/reasoning - Toggle display of reasoning content")
+                console.print("/memory - Toggle memory mode (Fast Trim vs Smart Summary)")
                 console.print("/help  - Show this help message\n")
 
             else:
@@ -124,7 +116,10 @@ def chat():
         else:
             # Check actual message length and trim if it exceeds 15
             if len(messages) > 15:
-                messages = trim_to_window(messages, max_messages=15)
+                if smart_memory_mode:
+                    messages = trim_with_summary(client, model_name, messages, max_messages=15, batch_size=5)
+                else:
+                    messages = trim_to_window(messages, max_messages=15)
 
             messages.append({"role": "user", "content": user_input})
             console.print("[bold blue]Agent:[/bold blue]\n", end="")
@@ -166,7 +161,7 @@ def chat():
                                 thinking_started = True
 
                             if reasoning_mode:
-                                console.print(reasoning, style="dim italic\n", end="")
+                                console.print(reasoning, style="dim italic", end="")
 
                             full_reasoning += reasoning
 
@@ -204,7 +199,7 @@ def chat():
                     messages.append({
                         "role": "assistant",
                         "content": full_content if full_content else None,
-                        "reasoning_content": full_reasoning if full_reasoning else None,  #debationg if i shuld include reasoning content in the message history or not
+                        #debationg if i shuld include reasoning content in the message history or not
                         "tool_calls": formatted_tool_calls
                     })
 
