@@ -31,6 +31,24 @@ memory_file = Path(__file__).parent / "memory" / "core_memory.md"
 app = typer.Typer()
 console = Console()
 
+
+def ensure_system_message_first(messages):
+    """Keep the system prompt at index 0 for local model compatibility."""
+    system_msg = None
+    other_msgs = []
+
+    for msg in messages:
+        if msg.get("role") == "system":
+            system_msg = msg
+        else:
+            other_msgs.append(msg)
+
+    if system_msg is None:
+        return messages
+
+    return [system_msg, *other_msgs]
+
+
 def build_system_prompt() -> str:
     """Combines system rules, user persona, and persistent core memory with capacity stats."""
     # 1. System rules
@@ -173,6 +191,7 @@ def chat():
                     messages = trim_with_summary(client, model_name, messages, max_messages=15, batch_size=5)
                 else:
                     messages = trim_to_window(messages, max_messages=15)
+                messages = ensure_system_message_first(messages)
 
             messages.append({"role": "user", "content": user_input})
             console.print("[bold blue]Agent:[/bold blue]\n", end="")
@@ -187,9 +206,11 @@ def chat():
                         console.print("\n[bold yellow]Agent fumbled: too many tool calls.[/bold yellow]")
                         break
 
+                    ordered_messages = ensure_system_message_first(messages)
+
                     response_stream = client.chat.completions.create(
                         model=model_name,
-                        messages=messages,
+                        messages=ordered_messages,
                         tools=ALL_TOOLS,
                         tool_choice="auto",
                         stream=True,
@@ -230,7 +251,7 @@ def chat():
 
                         if delta.content:
                             if thinking_started and has_reasoning and not full_content:
-                                console.print("\n", end="")
+                                console.print("\n\n", end="")
                             console.print(delta.content, style="bold cyan", end="")
                             full_content += delta.content
 
