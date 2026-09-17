@@ -6,9 +6,24 @@ from openai import OpenAI
 from rich.console import Console
 from pathlib import Path
 
+
+from config.welcome import run_first_setup
+from config.settings_manager import settings_menu
+
+run_first_setup()
+
 from skills import ALL_TOOLS, TOOL_MAP, set_yolo_mode
 from memory.memory_managment import trim_to_window, trim_with_summary #memory managment functions
-from config import API_KEY, BASE_URL, MAX_MEMORY_CHARS, MAX_TOKENS, MAX_TOOL_ROUNDS
+from config import (
+    API_KEY,
+    BASE_URL,
+    DEFAULT_MEMORY_MODE,
+    MAX_MEMORY_CHARS,
+    MAX_TOKENS,
+    MAX_TOOL_ROUNDS,
+)
+
+
 
 config_dir = Path(__file__).parent / "config"
 memory_file = Path(__file__).parent / "memory" / "core_memory.md"
@@ -94,7 +109,7 @@ def chat():
     messages = [{"role": "system", "content": build_system_prompt()}] # initialize chat messages history
     yolo_mode = False  # Track YOLO state locally
     reasoning_mode = True  # Track reasoning display state locally
-    smart_memory_mode = False  # Track memory mode locally
+    smart_memory_mode = DEFAULT_MEMORY_MODE == "smart"  # Track memory mode locally
 
     while True: # main chat loop
 
@@ -136,6 +151,8 @@ def chat():
                     console.print("[bold green]Memory Mode: SMART SUMMARY (Summarizes old context)[/bold green]\n")
                 else:
                     console.print("[bold yellow]Memory Mode: FAST TRIM (Drops older turns instantly)[/bold yellow]\n")
+            elif cmd == "/settings":
+                settings_menu()
             elif cmd == "/help":
                 console.print("[bold cyan]Available Commands:[/bold cyan]")
                 console.print("/bye   - Exit the chat")
@@ -143,6 +160,7 @@ def chat():
                 console.print("/yolo  - Toggle auto-approval for destructive actions")
                 console.print("/reasoning - Toggle display of reasoning content")
                 console.print("/memory - Toggle memory mode (Fast Trim vs Smart Summary)")
+                console.print("/settings - View or change saved settings")
                 console.print("/help  - Show this help message\n")
 
             else:

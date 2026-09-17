@@ -2,3 +2,4 @@ nano harnes.code-workspace
 __pycache__/
 *.py[cod]
 nano harnes.code-workspace
+.env
