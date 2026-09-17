@@ -31,7 +31,7 @@ Clone the repository, enter the project directory, and run:
 
 ```bash
 git clone https://github.com/Jero009/nanoharnes.git
-cd nanoharness
+cd nanoharnes
 ./install.sh
 ```
 
@@ -40,7 +40,7 @@ cd nanoharness
 ```bash
 sudo pacman -S --needed git python python-venv bubblewrap uv
 git clone https://github.com/Jero009/nanoharnes.git
-cd nanoharness
+cd nanoharnes
 ./install.sh
 ```
 
