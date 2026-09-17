@@ -20,7 +20,7 @@ sudo apt install bubblewrap
 Clone the repository, enter the project directory, and run:
 
 ```bash
-git clone <repo-url>
+git clone [<repo-url>](https://github.com/Jero009/nanoharnes.git)
 cd nano-harness
 ./install.sh
 ```
@@ -36,7 +36,7 @@ sudo pacman -S --needed python python-venv bubblewrap
 Then continue with the project setup:
 
 ```bash
-git clone <repo-url>
+git clone [<repo-url>](https://github.com/Jero009/nanoharnes.git)
 cd nano-harness
 ./install.sh
 ```
