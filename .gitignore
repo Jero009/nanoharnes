@@ -3,3 +3,5 @@ __pycache__/
 *.py[cod]
 nano harnes.code-workspace
 .env
+.venv/
+.pytest_cache/

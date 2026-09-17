@@ -1,95 +1,95 @@
 # Nano Harness
 
-A small local agent harness for OpenAI-compatible servers such as LM Studio.
-It provides file tools, directory tools, isolated shell commands, summaries, and persistent memory.
+Nano Harness is a local AI agent for OpenAI-compatible APIs. It provides file, directory, shell, and persistent-memory tools with approval checks for destructive actions.
 
 ## Requirements
 
 - Python 3.10+
-- LM Studio or another OpenAI-compatible local server
-- `bubblewrap` for isolated shell commands
-- Python packages: `openai`, `rich`, and `typer`
+- `uv`
+- `bubblewrap` for isolated shell tools
+- LM Studio, Ollama, or another OpenAI-compatible API
 
-Install the packages with:
-
-```bash
-pip install openai rich typer
-```
-
-## Run
-
-Start the local model server, then run:
+Install `bubblewrap` with your system package manager. For Debian or Ubuntu:
 
 ```bash
-python main.py
+sudo apt install bubblewrap
 ```
 
-The harness connects to:
+## Install and Run
 
-```text
-http://localhost:1234/v1
+Clone the repository, enter the project directory, and run:
+
+```bash
+./install.sh
 ```
 
-The first available model is used automatically.
+The installer creates `.venv` when needed and installs the packages from `requirements.txt`.
+
+On the first launch, Nano Harness asks you to choose a provider and a model-size profile. The profiles configure the context window, response length, memory limits, tool rounds, and output limits:
+
+- Under 15B
+- Around 27B
+- Over 50B
+
+Settings are saved in `.env`, which is ignored by Git. The first available model from the selected server is used automatically.
+
+To run it after setup without the installer:
+
+```bash
+.venv/bin/python main.py
+```
 
 ## Commands
 
-Inside the chat:
+Commands are entered inside the chat:
 
-- `/help` show commands
-- `/new` start a new chat
-- `/yolo` allow destructive file and shell actions without approval
-- `/reasoning` show or hide model reasoning output
-- `/memory` switch between fast trimming and summary memory
-- `/bye` exit
+| Command | Action |
+| --- | --- |
+| `/help` | Show available commands |
+| `/new` | Start a new chat |
+| `/settings` | View or edit individual saved settings |
+| `/memory` | Toggle fast trimming or smart summary memory |
+| `/reasoning` | Toggle reasoning output |
+| `/yolo` | Toggle automatic approval for destructive actions |
+| `/bye` | Exit Nano Harness |
+
+Changes made through `/settings` are saved to `.env`. Restart Nano Harness for them to take effect.
 
 ## Configuration
 
-Edit `config/settings.py` to change local server and agent limits:
+The setup wizard and `/settings` manage these values:
 
-- `BASE_URL` local OpenAI-compatible server URL
-- `MAX_TOKENS` maximum response tokens
-- `MAX_TOOL_ROUNDS` maximum tool rounds per request
-- `MAX_MEMORY_CHARS` persistent memory size
-- `MAX_FILE_SIZE_BYTES` maximum file size for normal reads
-- `CONTEXT_LENGTH` maximum text sent to summarization
-- `MAX_OUTPUT_CHARS` maximum shell output returned to the model
+- `API_KEY` and `BASE_URL`
+- `MAX_TOKENS`
+- `CONTEXT_LENGTH`
+- `MAX_MEMORY_CHARS`
+- `MAX_TOOL_ROUNDS`
+- `MAX_OUTPUT_CHARS`
+- `MAX_FILE_SIZE_BYTES`
+- `DEFAULT_MEMORY_MODE`
 
-## Workspace
+To run first-time setup again:
 
-File and directory tools are restricted to the `workspace/` directory.
-Shell commands run inside a Bubblewrap namespace with the workspace as the writable area and network access disabled.
-
-Use relative paths such as:
-
-```text
-notes/todo.md
-src/example.py
+```bash
+rm -f .env
+./install.sh
 ```
 
-## Persistent Memory
+## Workspace and Safety
 
-Important facts can be saved with the `save_memory` tool.
-They are stored in:
+File and directory tools are restricted to `workspace/`. Shell commands run inside a Bubblewrap namespace with the workspace as the writable area and network access disabled.
 
-```text
-memory/core_memory.md
-```
-
-The main system prompt loads this memory when a chat starts.
+Destructive file, directory, and shell actions ask for approval by default. Use `/yolo` only when you understand the command and its consequences.
 
 ## Project Layout
 
 ```text
-main.py                    Main chat entrypoint
-config/                    Settings, sandbox rules, and prompts
+main.py                    Chat entrypoint
+config/                    Settings, setup wizard, prompts, and sandbox rules
 skills/                    Agent tools
 memory/                    Context trimming and persistent memory
 workspace/                 Agent working directory
-dev/                       Notes and development files
+dev/                       Development notes
+install.sh                 Environment setup and launcher
+requirements.txt           Python dependencies
 ```
-
-## Safety
-
-Destructive file, directory, and shell actions ask for approval by default.
-Use `/yolo` only when you understand the command and its consequences.
