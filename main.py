@@ -206,18 +206,19 @@ def chat():
                     finish_reason = None
 
                     thinking_started = False
+                    has_reasoning = False
 
                     for chunk in response_stream:
                         finish_reason = getattr(chunk.choices[0], "finish_reason", None)
                         delta = chunk.choices[0].delta
                         reasoning = getattr(delta, "reasoning_content", None)
-                        
+
                         if reasoning:
                             if not thinking_started:
                                 if reasoning_mode:
-                                    console.print("[dim italic]Thinking: \n", end="")
+                                    console.print("[dim italic]Thinking: \n \n", end="")
                                 else:
-                                    console.print("[dim italic]Thinking...[/dim italic]\n", end="")
+                                    console.print("[dim italic]Thinking...[/dim italic]\n \n", end="")
                                     console.print("\n", end="")
                                 thinking_started = True
 
@@ -225,9 +226,11 @@ def chat():
                                 console.print(reasoning, style="dim italic", end="")
 
                             full_reasoning += reasoning
-
+                            has_reasoning = True
 
                         if delta.content:
+                            if thinking_started and has_reasoning and not full_content:
+                                console.print("\n", end="")
                             console.print(delta.content, style="bold cyan", end="")
                             full_content += delta.content
 
