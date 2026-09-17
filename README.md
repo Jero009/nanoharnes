@@ -20,7 +20,31 @@ sudo apt install bubblewrap
 Clone the repository, enter the project directory, and run:
 
 ```bash
+git clone <repo-url>
+cd nano-harness
 ./install.sh
+```
+
+### Arch Linux
+
+On Arch Linux, install the required system packages first:
+
+```bash
+sudo pacman -S --needed python python-venv bubblewrap
+```
+
+Then continue with the project setup:
+
+```bash
+git clone <repo-url>
+cd nano-harness
+./install.sh
+```
+
+If a package exists in the AUR for this project, you can also install it with:
+
+```bash
+yay -S nano-harness
 ```
 
 The installer creates `.venv` when needed and installs the packages from `requirements.txt`.
@@ -38,7 +62,6 @@ To run it after setup without the installer:
 ```bash
 .venv/bin/python main.py
 ```
-
 ## Commands
 
 Commands are entered inside the chat:
