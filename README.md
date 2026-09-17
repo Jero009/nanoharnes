@@ -2,6 +2,7 @@
 
 Nano Harness is a local AI agent for OpenAI-compatible APIs. It provides file, directory, shell, and persistent-memory tools with approval checks for destructive actions.
 
+
 ## Requirements
 
 - Python 3.10+
@@ -9,10 +10,19 @@ Nano Harness is a local AI agent for OpenAI-compatible APIs. It provides file, d
 - `bubblewrap` for isolated shell tools
 - LM Studio, Ollama, or another OpenAI-compatible API
 
-Install `bubblewrap` with your system package manager. For Debian or Ubuntu:
+Install the required system packages for your distro:
+
+### Debian / Ubuntu
 
 ```bash
-sudo apt install bubblewrap
+sudo apt update
+sudo apt install -y python3 python3-venv bubblewrap uv
+```
+
+### Arch Linux
+
+```bash
+sudo pacman -S --needed git python python-venv bubblewrap uv
 ```
 
 ## Install and Run
@@ -20,23 +30,16 @@ sudo apt install bubblewrap
 Clone the repository, enter the project directory, and run:
 
 ```bash
-git clone [<repo-url>](https://github.com/Jero009/nanoharnes.git)
+git clone https://github.com/Jero009/nanoharnes.git
 cd nano-harness
 ./install.sh
 ```
 
-### Arch Linux
-
-On Arch Linux, install the required system packages first:
+### Arch Linux quick-start
 
 ```bash
-sudo pacman -S --needed python python-venv bubblewrap
-```
-
-Then continue with the project setup:
-
-```bash
-git clone [<repo-url>](https://github.com/Jero009/nanoharnes.git)
+sudo pacman -S --needed git python python-venv bubblewrap uv
+git clone https://github.com/Jero009/nanoharnes.git
 cd nano-harness
 ./install.sh
 ```
@@ -47,7 +50,7 @@ If a package exists in the AUR for this project, you can also install it with:
 yay -S nano-harness
 ```
 
-The installer creates `.venv` when needed and installs the packages from `requirements.txt`.
+The installer creates `.venv` when needed and installs dependencies from `requirements.txt`.
 
 On the first launch, Nano Harness asks you to choose a provider and a model-size profile. The profiles configure the context window, response length, memory limits, tool rounds, and output limits:
 
