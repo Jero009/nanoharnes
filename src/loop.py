@@ -3,10 +3,13 @@ from connection import client, get_model_name
 
 def loop():
     model_name = get_model_name()
-    messages = [{"role": "system", "content": "You are are a helpful assistant."}]
+    messages = [{
+                    "role": "system", 
+                    "content": "You are are a helpful assistant."
+                }]
 
     while True:
-        user_input = input("\n User: ")
+        user_input = input("User: ")
         messages.append({"role": "user", "content": user_input})
 
         response_stream = client.chat.completions.create(
