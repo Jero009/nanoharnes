@@ -1,5 +1,9 @@
 # loop.py
 from connection import client, get_model_name
+from rich.console import Console
+from rich.text import Text
+
+console = Console()
 
 def loop():
     model_name = get_model_name()
@@ -9,7 +13,7 @@ def loop():
                 }]
 
     while True:
-        user_input = input("User: ")
+        user_input = console.input("[white]\nUser: [/white]")
         messages.append({"role": "user", "content": user_input})
 
         response_stream = client.chat.completions.create(
@@ -20,7 +24,7 @@ def loop():
                         presence_penalty=0.3,     # Penalizes words the model has already used
                         frequency_penalty=0.3,    # Discourages repeating the exact same phrases
         )
-        print("Nanocode: ",end="")
+        console.print("[bold cyan]Nanocode: [/bold cyan]", end="")
         full_response = ""
         full_reasoning = ""
 
@@ -34,17 +38,17 @@ def loop():
             )
 
             if reasoning: # reasoning content
-                print(reasoning, end="", flush=True)
+                console.print(reasoning,style="dim italic" ,end="")
                 full_reasoning += reasoning
 
             token = delta.content or ""
 
             if token: # chat response
-                print(token, end="", flush=True)
+                console.print(token, end="")
                 full_response += token
 
             if delta.tool_calls:
-                print("\n[Model requested a tool call]")
+                console.print("\n[Model requested a tool call]")
                 # Later: collect the chunks here before executing the tool.
 
         messages.append({
