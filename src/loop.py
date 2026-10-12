@@ -21,10 +21,33 @@ def loop():
                         frequency_penalty=0.3,    # Discourages repeating the exact same phrases
         )
         print("Nanocode: ",end="")
-        response = ""
-        for chunk in response_stream:
-            token = chunk.choices[0].delta.content or ""
-            print(token, end="", flush=True)
-            response += token
+        full_response = ""
+        full_reasoning = ""
 
-        messages.append({"role": "assistant", "content": response})
+        for chunk in response_stream:
+            choice = chunk.choices[0]
+            delta = choice.delta
+
+            reasoning = (
+                getattr(delta, "reasoning_content", None)
+                or getattr(delta, "reasoning", None)
+            )
+
+            if reasoning: # reasoning content
+                print(reasoning, end="", flush=True)
+                full_reasoning += reasoning
+
+            token = delta.content or ""
+
+            if token: # chat response
+                print(token, end="", flush=True)
+                full_response += token
+
+            if delta.tool_calls:
+                print("\n[Model requested a tool call]")
+                # Later: collect the chunks here before executing the tool.
+
+        messages.append({
+            "role": "assistant",
+            "content": full_response,
+        })
