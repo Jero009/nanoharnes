@@ -42,3 +42,21 @@ def read_file(file_path: str) -> str:
         return f"Error: '{file_path}' is not a UTF-8 text file."
     except OSError as error:
         return f"Error reading '{file_path}': {error}"
+
+def create_file(file_path: str, content: str = "") -> str:
+    """Create a new file. Parent folders are created automatically."""
+    target_path = (ALLOWED_DIR / file_path).resolve()
+
+    error = check_path_allowed(target_path)
+    if error:
+        return error
+    if target_path.exists():
+        return "Error: File already exists."
+
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+    except Exception as exc:
+        return f"Error: {exc!r}"
+
+    return "File created."

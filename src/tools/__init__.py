@@ -1,29 +1,47 @@
-from .file_tools import read_file
+import inspect
+from .file_tools import read_file, create_file
 
-TOOLS = [
-    {
+
+FUNCTIONS = [
+    read_file,
+    create_file,
+]
+TOOL_FUNCTIONS = {
+    function.__name__: function
+    for function in FUNCTIONS
+}
+def function_to_schema(func):
+    """Generate an OpenAI tool schema from a Python function."""
+    signature = inspect.signature(func)
+    properties = {}
+    required = []
+    type_map = {
+        str: "string",
+        int: "integer",
+        float: "number",
+        bool: "boolean",
+    }
+    for parameter_name, parameter in signature.parameters.items():
+        parameter_type = type_map.get(parameter.annotation, "string")
+        properties[parameter_name] = {
+            "type": parameter_type,
+        }
+        if parameter.default is inspect.Parameter.empty:
+            required.append(parameter_name)
+    return {
         "type": "function",
         "function": {
-            "name": "read_file",
-            "description": "Read a small text file",
+            "name": func.__name__,
+            "description": func.__doc__ or "",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": (
-                            "Relative path to the file, for example "
-                            "'src/main.py'. Absolute paths are forbidden."
-                        ),
-                    },
-                },
-                "required": ["file_path"],
+                "properties": properties,
+                "required": required,
                 "additionalProperties": False,
             },
         },
-    },
+    }
+TOOLS = [
+    function_to_schema(function)
+    for function in FUNCTIONS
 ]
-
-TOOL_FUNCTIONS = {
-    "read_file": read_file,
-}

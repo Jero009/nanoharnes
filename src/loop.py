@@ -54,8 +54,7 @@ def loop():
                 full_response += token
 
             if delta.tool_calls:
-                console.print("\n[Model requested a tool call]")
-                # Later: collect the chunks here before executing the tool.
+                console.print(delta.tool_calls, end= "" ,style="bold yellow")
 
         messages.append({
             "role": "assistant",
