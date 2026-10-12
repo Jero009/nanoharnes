@@ -3,6 +3,8 @@ from connection import client, get_model_name
 from rich.console import Console
 from rich.text import Text
 
+from tools import TOOLS
+
 console = Console()
 
 def loop():
@@ -19,11 +21,15 @@ def loop():
         response_stream = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
+                        tools=TOOLS, # gives a list of tools to the model, so it can call them if needed
+                        tool_choice="auto",
                         stream=True,
                         temperature=0.6,          # 0.6 - 0.7 prevents rigid deterministic loops
                         presence_penalty=0.3,     # Penalizes words the model has already used
                         frequency_penalty=0.3,    # Discourages repeating the exact same phrases
         )
+
+
         console.print("[bold cyan]Nanocode: [/bold cyan]", end="")
         full_response = ""
         full_reasoning = ""
