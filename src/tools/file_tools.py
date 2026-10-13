@@ -17,7 +17,7 @@ def read_file(file_path: str) -> str:
 
     target_path = (ALLOWED_DIR / requested_path).resolve()  # check if the file is within the allowed directory
  
-    error = (target_path)
+    error = check_path_allowed(target_path)
     if error:
         return error
 
