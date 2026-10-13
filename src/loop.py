@@ -1,5 +1,5 @@
 # loop.py
-from connection import client, get_model_name
+from config.connection import client, get_model_name
 from rich.console import Console
 import json
 
@@ -22,6 +22,7 @@ def loop():
         })
 
         # Keeps responding while the model requests tools.
+        console.print("[bold cyan]Nanocode: [/bold cyan]", end="")
         while True:
             response_stream = client.chat.completions.create(
                 model=model_name,
@@ -34,7 +35,7 @@ def loop():
                 frequency_penalty=0.3,    # Discourages repeating the exact same phrases
             )
 
-            console.print("[bold cyan]Nanocode: [/bold cyan]", end="")
+            
 
             full_response = ""
             full_reasoning = ""

@@ -1,15 +1,24 @@
 import inspect
-from .file_tools import read_file, create_file
-
+from .file_tools import edit_file, read_file, create_file,delete_file, rename_file, get_file_length
+from .dir_tools import pwd, ls, mkdir
 
 FUNCTIONS = [
     read_file,
     create_file,
+    edit_file,
+    delete_file,
+    rename_file,
+    get_file_length,
+    pwd,
+    ls,
+    mkdir,
+    
 ]
 TOOL_FUNCTIONS = {
     function.__name__: function
     for function in FUNCTIONS
 }
+
 def function_to_schema(func):
     """Generate an OpenAI tool schema from a Python function."""
     signature = inspect.signature(func)
