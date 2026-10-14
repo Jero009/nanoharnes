@@ -1,5 +1,6 @@
 from pathlib import Path
 from config import ALLOWED_DIR, MAX_FILE_SIZE_BYTES
+import typer
 
 def check_path_allowed(path: Path) -> str | None:
     try:
@@ -88,19 +89,19 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
 
 
 def delete_file(file_path: str) -> str:
-    """Delete a file. Asks for approval"""
-    target_path = (ALLOWED_DIR / file_path).resolve()
+    path = check_path_allowed(file_path)
 
-    error = check_path_allowed(target_path)
-    if error:
-        return error
-    if not target_path.exists():
-        return f"Error: File '{file_path}' not found."
-    try:
-        target_path.unlink()
-        return f"File deleted: {file_path}"
-    except Exception as e:
-        return f"Error deleting file: {e}"
+    if not path.is_file():
+        return f"Error: File not found: {file_path}"
+
+    if not typer.confirm(
+        f" [!]  APPROVAL NEEDED: Agent wants to DELETE file: '{file_path}'. Allow?",
+        default=False,
+    ):
+        return "Action canceled: User denied deletion request."
+
+    path.unlink()
+    return f"File deleted: {file_path}"
 
 def rename_file(file_path: str, new_file_path: str) -> str:
     """Rename or move a file. The destination must not exist."""
