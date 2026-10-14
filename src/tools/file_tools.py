@@ -104,7 +104,7 @@ def delete_file(file_path: str) -> str:
         return f"Error: File not found: {file_path}"
 
     if not typer.confirm(
-        f"[yellow] [!]  APPROVAL NEEDED: Agent wants to DELETE file: '{file_path}'. Allow? [/yellow]",
+        f" [!]  APPROVAL NEEDED: Agent wants to DELETE file: '{file_path}'. Allow? ",
         default=False,
     ):
         return "Action canceled: User denied deletion request."
@@ -153,7 +153,7 @@ def get_file_length(file_path: str) -> str:
 
         # Stream lines efficiently without loading the whole file into RAM
         line_count = 0
-        with target_path.open("r", encoding="utf-8", errors="ignore") as f:
+        with target_path.open("r", encoding="utf-8") as f:
             for line in f:
                 line_count += 1
 
@@ -166,5 +166,8 @@ def get_file_length(file_path: str) -> str:
             size_str = f"{size_bytes / (1024 * 1024):.2f} MB"
 
         return f"File '{file_path}': {line_count} lines ({size_str})."
+    
+    except UnicodeDecodeError:
+        return f"Error: '{file_path}' is not a UTF-8 text file."
     except Exception as exc:
         return f"Error: {exc!r}"

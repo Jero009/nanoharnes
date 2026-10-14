@@ -1,5 +1,6 @@
 import subprocess
 import shutil
+import typer
 from config import ALLOWED_DIR
 from config.settings import MAX_OUTPUT_CHARS 
 
@@ -8,6 +9,13 @@ def execute_command(command: str) -> str:
     sandbox = shutil.which("bwrap")
     if sandbox is None:
         return "Error: bubblewrap is required to run shell commands safely."
+    #give the user a chance to approve the command before executing it
+    confirm = typer.confirm(
+        f"[!]  [APPROVAL NEEDED] Agent wants to run shell command: $ {command}  Allow? ",
+        default=False,
+    )
+    if not confirm:
+        return "Action canceled: User denied command execution."
     try:
         # 2. Give the process a temporary root and expose only the workspace
         # as writable. Network access is disabled for shell commands.
