@@ -1,8 +1,8 @@
 import subprocess
 import shutil
 import typer
-from config import ALLOWED_DIR
-from config.settings import MAX_OUTPUT_CHARS 
+from config import ALLOWED_DIR,MAX_OUTPUT_CHARS
+
 
 def execute_command(command: str) -> str:
     """Run a shell command in the isolated workspace. Network is disabled."""

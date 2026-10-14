@@ -3,6 +3,7 @@ from config.connection import client, get_model_name
 from rich.console import Console
 import json
 
+from config import MAX_TOOL_ROUNDS
 from tools import TOOLS, TOOL_FUNCTIONS
 
 console = Console()
@@ -21,6 +22,8 @@ def loop():
             "content": user_input,
         })
 
+        tool_rounds = 0
+
         # Keeps responding while the model requests tools.
         console.print("[bold cyan]Nanocode: [/bold cyan]", end="")
         while True:
@@ -35,8 +38,6 @@ def loop():
                 frequency_penalty=0.3,    # Discourages repeating the exact same phrases
             )
 
-            
-
             full_response = ""
             full_reasoning = ""
             tool_calls_data = {}
@@ -50,18 +51,18 @@ def loop():
                 content = getattr(delta, "content", None)
                 tool_calls = getattr(delta, "tool_calls", None)
 
-                if reasoning: # if reasoning is present print it
+                if reasoning:  # if reasoning is present print it
                     console.print(reasoning, style="dim italic", end="")
                     full_reasoning += reasoning
 
-                if content: #if content is present print it
+                if content:  # if content is present print it
                     console.print(content, end="")
                     full_response += content
 
-                if tool_calls: # if tool calls are present
+                if tool_calls:  # if tool calls are present
                     # Tool arguments can arrive in multiple streamed chunks.
                     for tc in tool_calls:
-                        saved_call = tool_calls_data.setdefault( 
+                        saved_call = tool_calls_data.setdefault(
                             tc.index,
                             {
                                 "id": None,
@@ -70,10 +71,10 @@ def loop():
                             },
                         )
 
-                        if tc.id: #set the id for the json 
+                        if tc.id:  # set the id for the json
                             saved_call["id"] = tc.id
 
-                        if tc.function.name: #set the name for the json
+                        if tc.function.name:  # set the name for the json
                             saved_call["name"] = tc.function.name
 
                         saved_call["arguments"] += (
@@ -86,7 +87,7 @@ def loop():
                 "content": full_response or None,
             }
 
-            if tool_calls_data: # if there are tool calls, add them to the assistant message
+            if tool_calls_data:  # if there are tool calls, add them to the assistant message
                 assistant_message["tool_calls"] = [
                     {
                         "id": tool_call["id"],
@@ -104,6 +105,27 @@ def loop():
             # Normal answer: leave the tool loop and ask the user again.
             if not tool_calls_data:
                 break
+
+            # A tool round is one model response containing one or more tool calls.
+            # Do not execute another tool round after reaching the configured limit.
+            if tool_rounds >= MAX_TOOL_ROUNDS:
+                result = (
+                    f"Error: Maximum tool rounds ({MAX_TOOL_ROUNDS}) exceeded. "
+                    "Stop using tools and give the user a final answer."
+                )
+
+                for tc in tool_calls_data.values():
+                    # Send the tool result back to the model using its original call ID.
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": result,
+                    })
+
+                console.print(f"\n[yellow]{result}[/yellow]")
+                break
+
+            tool_rounds += 1
 
             # Execute only tools explicitly present in TOOL_FUNCTIONS.
             for tc in tool_calls_data.values():
