@@ -288,6 +288,76 @@ class ToolTests(unittest.TestCase):
         self.assertTrue(target.exists())
         self.assertIn("denied", result.lower())
         confirm.assert_called_once()
+    def test_read_lines_returns_requested_range(self):
+        (self.workspace / "lines.txt").write_text(
+            "one\ntwo\nthree\nfour\nfive\n",
+            encoding="utf-8",
+        )
+        result = file_tools.read_lines(
+            "lines.txt",
+            start_line=2,
+            line_count=3,
+        )
+        self.assertEqual(result, "two\nthree\nfour\n")
+    def test_read_lines_rejects_path_traversal(self):
+        result = file_tools.read_lines(
+            "../secret.txt",
+            start_line=1,
+            line_count=1,
+        )
+        self.assertIn("outside the allowed workspace", result)
+    def test_read_lines_rejects_invalid_start_line(self):
+        (self.workspace / "lines.txt").write_text(
+            "one\ntwo\n",
+            encoding="utf-8",
+        )
+        result = file_tools.read_lines(
+            "lines.txt",
+            start_line=0,
+            line_count=1,
+        )
+        self.assertIn("start_line must be at least 1", result)
+    def test_read_lines_rejects_invalid_line_count(self):
+        (self.workspace / "lines.txt").write_text(
+            "one\ntwo\n",
+            encoding="utf-8",
+        )
+        zero_result = file_tools.read_lines(
+            "lines.txt",
+            start_line=1,
+            line_count=0,
+        )
+        too_many_result = file_tools.read_lines(
+            "lines.txt",
+            start_line=1,
+            line_count=201,
+        )
+        self.assertIn("line_count must be at least 1", zero_result)
+        self.assertIn("line_count cannot exceed 200", too_many_result)
+    def test_read_lines_rejects_non_utf8_file(self):
+        (self.workspace / "binary.bin").write_bytes(b"\xff\xfe")
+        result = file_tools.read_lines(
+            "binary.bin",
+            start_line=1,
+            line_count=1,
+        )
+        self.assertIn("not a UTF-8 text file", result)
+    def test_read_lines_rejects_oversized_output(self):
+        original_max_output = file_tools.MAX_OUTPUT_CHARS
+        file_tools.MAX_OUTPUT_CHARS = 10
+        try:
+            (self.workspace / "large-lines.txt").write_text(
+                "this line is too long\n",
+                encoding="utf-8",
+            )
+            result = file_tools.read_lines(
+                "large-lines.txt",
+                start_line=1,
+                line_count=1,
+            )
+            self.assertIn("output limit", result)
+        finally:
+            file_tools.MAX_OUTPUT_CHARS = original_max_output
 
 if __name__ == "__main__":
     unittest.main()

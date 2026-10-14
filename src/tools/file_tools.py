@@ -2,6 +2,8 @@ from pathlib import Path
 from config import ALLOWED_DIR, MAX_FILE_SIZE_BYTES
 import typer
 
+from config import MAX_OUTPUT_CHARS
+
 def check_path_allowed(path: Path) -> str | None:
     try:
         path.relative_to(ALLOWED_DIR)
@@ -171,3 +173,52 @@ def get_file_length(file_path: str) -> str:
         return f"Error: '{file_path}' is not a UTF-8 text file."
     except Exception as exc:
         return f"Error: {exc!r}"
+
+def read_lines(file_path: str,start_line: int = 1,line_count: int = 50,) -> str:
+    """Read a limited range of UTF-8 text-file lines."""
+    target_path = (ALLOWED_DIR / file_path).resolve()
+
+    error = check_path_allowed(target_path)
+    if error:
+        return error
+    if not target_path.exists():
+        return f"Error: File '{file_path}' not found."
+    if not target_path.is_file():
+        return f"Error: '{file_path}' is not a file."
+
+    if start_line < 1:
+        return "Error: start_line must be at least 1."
+    if line_count < 1:
+        return "Error: line_count must be at least 1."
+    if line_count > 200:
+        return "Error: line_count cannot exceed 200."
+
+    end_line = start_line + line_count - 1
+
+    try:
+        lines = []
+
+        with target_path.open("r", encoding="utf-8") as file:
+            for line_no, line in enumerate(file, start=1):
+                if line_no < start_line:
+                    continue
+                if line_no > end_line:
+                    break
+
+                lines.append(line)
+
+                if sum(len(item) for item in lines) > MAX_OUTPUT_CHARS:
+                    return (
+                        f"Error: selected lines exceed the "
+                        f"{MAX_OUTPUT_CHARS}-character output limit."
+                    )
+
+        if not lines:
+            return f"File '{file_path}' has fewer than {start_line} lines."
+
+        return "".join(lines)
+
+    except UnicodeDecodeError:
+        return f"Error: '{file_path}' is not a UTF-8 text file."
+    except OSError as error:
+        return f"Error reading file lines: {error}"

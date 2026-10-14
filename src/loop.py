@@ -3,16 +3,15 @@ from config.connection import client, get_model_name
 from rich.console import Console
 import json
 
-from config import MAX_TOOL_ROUNDS
+from config import MAX_TOOL_ROUNDS,SYSTEM_PROMPT
 from tools import TOOLS, TOOL_FUNCTIONS
-
 console = Console()
 
 def loop():
     model_name = get_model_name()
     messages = [{
         "role": "system",
-        "content": "You are are a helpful assistant."
+        "content": SYSTEM_PROMPT
     }]
 
     while True:
