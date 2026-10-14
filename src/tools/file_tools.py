@@ -63,7 +63,6 @@ def create_file(file_path: str, content: str = "") -> str:
     return "File created."
 
 
-
 def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
     """Replace or append to an existing file."""
     target_path = (ALLOWED_DIR / file_path).resolve()
@@ -89,19 +88,31 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
 
 
 def delete_file(file_path: str) -> str:
-    path = check_path_allowed(file_path)
+    """Delete a file."""
+    requested_path = Path(file_path)
+
+    if requested_path.is_absolute():
+        return "Error: file_path must be relative to the workspace."
+
+    path = (ALLOWED_DIR / requested_path).resolve()
+
+    error = check_path_allowed(path)
+    if error:
+        return error
 
     if not path.is_file():
         return f"Error: File not found: {file_path}"
 
     if not typer.confirm(
-        f" [!]  APPROVAL NEEDED: Agent wants to DELETE file: '{file_path}'. Allow?",
+        f"[yellow] [!]  APPROVAL NEEDED: Agent wants to DELETE file: '{file_path}'. Allow? [/yellow]",
         default=False,
     ):
         return "Action canceled: User denied deletion request."
 
     path.unlink()
     return f"File deleted: {file_path}"
+
+
 
 def rename_file(file_path: str, new_file_path: str) -> str:
     """Rename or move a file. The destination must not exist."""
