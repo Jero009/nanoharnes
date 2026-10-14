@@ -14,5 +14,4 @@ BANNER = r"""
 """
 console.print(BANNER)
 if __name__ == "__main__":
-
     loop()

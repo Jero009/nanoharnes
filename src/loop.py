@@ -3,9 +3,10 @@ from config.connection import client, get_model_name
 from rich.console import Console
 import json
 
-from config import MAX_TOOL_ROUNDS,SYSTEM_PROMPT
+from config import MAX_TOOL_ROUNDS,SYSTEM_PROMPT,MAX_HISTORY_TURNS
 from tools import TOOLS, TOOL_FUNCTIONS
 console = Console()
+from context.history import trim_history
 
 def loop():
     model_name = get_model_name()
@@ -20,6 +21,7 @@ def loop():
             "role": "user",
             "content": user_input,
         })
+        messages = trim_history(messages, MAX_HISTORY_TURNS) #trim history to keep the system message and the newest complete user turns
 
         tool_rounds = 0
 
