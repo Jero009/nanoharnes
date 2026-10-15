@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from memory import memory as store
+import memory as store
 
 
 class MemoryTests(unittest.TestCase):
