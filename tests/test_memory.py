@@ -156,17 +156,6 @@ class MemoryTests(unittest.TestCase):
             self.assertEqual(calls, [])
             self.assertEqual(self.path.read_bytes(), original)
 
-    def test_legacy_memory_copied_without_deleting_source(self):
-        legacy = self.path.parent / "old.json"
-        new = self.path.parent / "private" / "memories.json"
-        legacy.write_text('{"old": "kept"}', encoding="utf-8")
-        with patch.object(store, "MEMORY_FILE", new), \
-             patch.object(store, "DEFAULT_MEMORY_FILE", new), \
-             patch.object(store, "LEGACY_MEMORY_FILE", legacy):
-            self.assertEqual(store.list_memory(), {"old": "kept"})
-            self.assertEqual(new.read_bytes(), legacy.read_bytes())
-            self.assertTrue(legacy.exists())
-
     def test_new_fact_is_protected_during_automatic_compaction(self):
         with patch.object(store, "MAX_MEMORY_BYTES", 80):
             self.seed(json.dumps({"old": "B" * 35}))

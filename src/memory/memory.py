@@ -3,35 +3,13 @@ import os
 import tempfile
 from typing import Callable
 from uuid import uuid4
-from memory import MEMORY_FILE, LEGACY_MEMORY_FILE
-
-DEFAULT_MEMORY_FILE = MEMORY_FILE
-
-MAX_MEMORY_BYTES = 100_000
-MAX_COMPACTION_INPUT_BYTES = 500_000
+from memory import MEMORY_FILE, MAX_MEMORY_BYTES, MAX_COMPACTION_INPUT_BYTES
 
 
 def _encoded(data: dict[str, str]) -> bytes:
     return (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
-def _migrate_legacy_memory() -> None:
-    """Copy old tracked data on first use; never delete the source."""
-    if MEMORY_FILE != DEFAULT_MEMORY_FILE or MEMORY_FILE.exists() or not LEGACY_MEMORY_FILE.exists():
-        return
-    if LEGACY_MEMORY_FILE.stat().st_size > MAX_COMPACTION_INPUT_BYTES:
-        raise ValueError("Legacy memory too large to migrate.")
-    MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp_name = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="wb", dir=MEMORY_FILE.parent,
-                                         prefix=".memory-", delete=False) as temp:
-            temp_name = temp.name
-            temp.write(LEGACY_MEMORY_FILE.read_bytes())
-        os.replace(temp_name, MEMORY_FILE)
-    finally:
-        if temp_name and os.path.exists(temp_name):
-            os.unlink(temp_name)
 def get_memory(key: str) -> str | None:
     """Return a saved fact, or None if the key does not exist."""
     if not key.strip():
@@ -43,7 +21,6 @@ def list_memory() -> dict[str, str]:
 
 
 def _load_memory(max_bytes: int) -> dict[str, str]:
-    _migrate_legacy_memory()
     try:
         if MEMORY_FILE.stat().st_size > max_bytes:
             raise ValueError("Memory file is too large.")
@@ -69,7 +46,6 @@ def compact_memory_if_needed(
     model_name: str | None = None,
 ) -> bool:
     """Ask the configured model to trim an oversized store, pending approval."""
-    _migrate_legacy_memory()
     try:
         if MEMORY_FILE.stat().st_size <= MAX_MEMORY_BYTES:
             return False
