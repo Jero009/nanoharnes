@@ -153,13 +153,27 @@ class NanoHarness(App):
             with Horizontal(id="composer"):
                 yield Input(placeholder="Message NanoHarness…", id="prompt")
                 yield Button("↵", id="send")
-            yield Static("Enter send · Ctrl+L clear chat", id="hint")
+            yield Static("Enter send · Ctrl+L new chat · /help commands", id="hint")
     async def send_message(self) -> None:
         if self.busy:
             return
         prompt = self.query_one("#prompt", Input)
         text = prompt.value.strip()
         if not text:
+            return
+        if text.startswith("/"):
+            prompt.value = ""
+            if text == "/bye":
+                self.exit()
+            elif text == "/new":
+                self.messages = new_messages()
+                await self.clear_chat()
+            elif text == "/clear":
+                await self.clear_chat()
+            elif text == "/help":
+                self.show_event("help", "/clear — hide chat · /new — reset conversation · /help — commands · /bye — exit")
+            else:
+                self.show_event("error", f"Unknown command: {text}. Type /help.")
             return
         chat = self.query_one("#chat", VerticalScroll)
         await chat.mount(Static(f"You: {text}", classes="message user", markup=False))
@@ -235,10 +249,14 @@ class NanoHarness(App):
         if self.busy:
             return
         self.messages = new_messages()
+        await self.clear_chat()
+
+    async def clear_chat(self) -> None:
         chat = self.query_one("#chat", VerticalScroll)
         for child in list(chat.children):
             await child.remove()
-        await chat.mount(Static("Chat cleared.", classes="message event"))
+        self.reply = None
+        self.thinking = None
 
 
 class ApprovalDialog(Vertical):

@@ -136,6 +136,51 @@ class TuiTests(unittest.TestCase):
         for tool in TOOLS:
             self.assertNotIn("approve", tool["function"]["parameters"]["properties"])
 
+    def test_slash_commands_are_local_and_clear_differs_from_new(self):
+        requests = []
+
+        def fake_turn(messages, text, **kwargs):
+            requests.append((list(messages), text))
+
+        async def check():
+            with patch("tui.run_turn", side_effect=fake_turn):
+                app = NanoHarness()
+                async with app.run_test() as pilot:
+                    prompt = app.query_one("#prompt", Input)
+
+                    async def submit(text):
+                        prompt.focus()
+                        await pilot.press(*text, "enter")
+                        await pilot.pause()
+                        self.assertEqual(prompt.value, "")
+
+                    app.messages.extend([{"role": "user", "content": "old"},
+                                         {"role": "assistant", "content": "answer"}])
+                    await submit("/help")
+                    chat = app.query_one("#chat", VerticalScroll)
+                    self.assertIn("/clear", str(list(chat.children)[-1].render()))
+                    await submit("/unknown")
+                    self.assertIn("Unknown command", str(list(chat.children)[-1].render()))
+                    await submit("/clear extra")
+                    self.assertIn("Unknown command", str(list(chat.children)[-1].render()))
+                    await submit("/clear")
+                    self.assertEqual(len(chat.children), 0)
+                    self.assertEqual(len(app.messages), 3)
+                    await submit("hello")
+                    await app.workers.wait_for_complete()
+                    self.assertEqual(len(requests), 1)
+                    self.assertEqual(requests[0][1], "hello")
+                    self.assertEqual(requests[0][0], app.messages)
+                    await submit("/new")
+                    self.assertEqual(len(chat.children), 0)
+                    self.assertEqual([message["role"] for message in app.messages], ["system"])
+                    with patch.object(app, "exit") as exit_app:
+                        await submit("/bye")
+                        exit_app.assert_called_once_with()
+                    self.assertEqual(len(requests), 1)
+
+        asyncio.run(check())
+
 
 if __name__ == "__main__":
     unittest.main()
