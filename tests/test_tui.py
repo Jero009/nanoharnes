@@ -99,6 +99,18 @@ class TuiTests(unittest.TestCase):
                 svg = html.unescape(app.export_screenshot()).replace("\xa0", " ")
                 self.assertIn("NanoHarness is ready", svg)
                 self.assertIn("Approve this action?", svg)
+                actions = app.query_one("#approval-actions").region
+                deny = app.query_one("#deny")
+                approve = app.query_one("#approve")
+                self.assertAlmostEqual((deny.region.x + approve.region.right) / 2,
+                                       (actions.x + actions.right) / 2, delta=1)
+                await pilot.hover("#approve")
+                await pilot.pause()
+                self.assertEqual(approve.region.height, 1)
+                self.assertEqual(approve.styles.background.ansi, -1)
+                self.assertFalse(approve.styles.border)
+                self.assertEqual(approve.styles.background_tint.a, 0)
+                self.assertEqual(approve.styles.tint.a, 0)
                 await pilot.press("tab")
                 self.assertEqual(app.focused.id, "approve")
                 await pilot.press("tab")

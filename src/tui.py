@@ -109,10 +109,25 @@ class NanoHarness(App):
     #approval-actions {
         dock: bottom;
         height: 3;
+        align: center middle;
     }
     #approval-actions Button {
         width: 12;
         min-width: 12;
+        height: 1;
+        min-height: 1;
+        border: none !important;
+        background: ansi_default !important;
+        background-tint: transparent;
+        tint: transparent;
+        color: ansi_default;
+    }
+    #approval-actions Button:hover, #approval-actions Button:focus {
+        border: none !important;
+        background: ansi_default !important;
+        background-tint: transparent;
+        tint: transparent;
+        text-style: bold underline;
     }
     """
     BINDINGS = [("ctrl+l", "clear_chat", "Clear chat")]
@@ -244,8 +259,8 @@ class ApprovalDialog(Vertical):
                      "\nTab: choose · Enter: confirm · Esc: deny",
                      id="approval-text", markup=False)
         with Horizontal(id="approval-actions"):
-            yield Button("Deny", id="deny")
-            yield Button("Approve", id="approve")
+            yield Button("Deny", id="deny", compact=True)
+            yield Button("Approve", id="approve", compact=True)
 
     def on_mount(self) -> None:
         self.query_one("#deny", Button).focus()
