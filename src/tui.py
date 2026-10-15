@@ -2,8 +2,8 @@ from threading import Event
 
 from textual import work
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static
 
 from loop import new_messages, run_turn
@@ -89,14 +89,15 @@ class NanoHarness(App):
     #hint {
         color: #aaaaaa;
     }
-    ApprovalModal {
-        align: center middle;
-        background: ansi_default 70%;
-    }
-    #approval {
-        width: 70;
-        max-width: 90%;
+    ApprovalDialog {
+        overlay: screen;
+        position: absolute;
+        offset: 40% 8;
+        width: 55%;
         height: auto;
+        max-height: 70%;
+        overflow-y: auto;
+        constrain-y: inside;
         padding: 1 2;
         background: ansi_default;
         border: solid white;
@@ -106,7 +107,12 @@ class NanoHarness(App):
         margin-bottom: 1;
     }
     #approval-actions {
+        dock: bottom;
         height: 3;
+    }
+    #approval-actions Button {
+        width: 12;
+        min-width: 12;
     }
     """
     BINDINGS = [("ctrl+l", "clear_chat", "Clear chat")]
@@ -178,8 +184,10 @@ class NanoHarness(App):
             approved = result is True
             decision.set()
 
-        self.call_from_thread(self.push_screen, ApprovalModal(description), finish)
+        dialog = ApprovalDialog(description, finish)
+        self.call_from_thread(self.screen.mount, dialog)
         if not decision.wait(300):
+            self.call_from_thread(dialog.remove)
             return False
         return approved
 
@@ -218,28 +226,51 @@ class NanoHarness(App):
         await chat.mount(Static("Chat cleared.", classes="message event"))
 
 
-class ApprovalModal(ModalScreen[bool]):
-    BINDINGS = [("escape", "deny", "Deny")]
+class ApprovalDialog(Vertical):
+    BINDINGS = [
+        Binding("escape", "deny", "Deny", priority=True),
+        Binding("tab", "next_choice", "Next choice", show=False, priority=True),
+        Binding("shift+tab", "next_choice", "Previous choice", show=False, priority=True),
+    ]
 
-    def __init__(self, description: str):
+    def __init__(self, description: str, finish):
         super().__init__()
         self.description = description
+        self.finish = finish
+        self.resolved = False
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="approval"):
-            yield Static("Approve this action?\n" + self.description, id="approval-text", markup=False)
-            with Horizontal(id="approval-actions"):
-                yield Button("Deny", id="deny")
-                yield Button("Approve", id="approve")
+        yield Static("Approve this action?\n" + self.description +
+                     "\nTab: choose · Enter: confirm · Esc: deny",
+                     id="approval-text", markup=False)
+        with Horizontal(id="approval-actions"):
+            yield Button("Deny", id="deny")
+            yield Button("Approve", id="approve")
 
     def on_mount(self) -> None:
         self.query_one("#deny", Button).focus()
 
     def action_deny(self) -> None:
-        self.dismiss(False)
+        self.resolve(False)
+
+    def action_next_choice(self) -> None:
+        target = "approve" if self.app.focused.id == "deny" else "deny"
+        self.query_one(f"#{target}", Button).focus()
+
+    def resolve(self, approved: bool) -> None:
+        if self.resolved:
+            return
+        self.resolved = True
+        self.finish(approved)
+        self.remove()
+
+    def on_unmount(self) -> None:
+        if not self.resolved:
+            self.resolve(False)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(event.button.id == "approve")
+        event.stop()
+        self.resolve(event.button.id == "approve")
 
 if __name__ == "__main__":
     NanoHarness().run()

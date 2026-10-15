@@ -1,4 +1,5 @@
 import asyncio
+import html
 import sys
 import unittest
 from pathlib import Path
@@ -7,7 +8,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from textual.widgets import Input
 from textual.containers import VerticalScroll
-from tui import NanoHarness, ApprovalModal
+from tui import NanoHarness, ApprovalDialog
 from tools import TOOLS
 
 
@@ -52,11 +53,13 @@ class TuiTests(unittest.TestCase):
             app = NanoHarness()
             async with app.run_test() as pilot:
                 results = []
-                app.push_screen(ApprovalModal("Delete file: /workspace/a"), results.append)
+                await app.screen.mount(ApprovalDialog("Delete file: /workspace/a", results.append))
                 await pilot.pause()
+                self.assertIsNotNone(app.query_one("#chat"))
                 await pilot.press("escape")
                 await pilot.pause()
                 self.assertEqual(results, [False])
+                self.assertEqual(len(app.query("ApprovalDialog")), 0)
         asyncio.run(check())
 
     def test_worker_approval_denies_then_allows(self):
@@ -74,15 +77,47 @@ class TuiTests(unittest.TestCase):
                         await pilot.press("x", "enter")
                         for _ in range(30):
                             await pilot.pause()
-                            if isinstance(app.screen, ApprovalModal):
+                            if app.query("ApprovalDialog"):
                                 break
-                        self.assertIsInstance(app.screen, ApprovalModal)
+                        self.assertEqual(len(app.query("ApprovalDialog")), 1)
                         await pilot.click(f"#{button_id}")
                         await app.workers.wait_for_complete()
                         await pilot.pause()
                         chat = app.query_one("#chat", VerticalScroll)
                         self.assertIn(expected, str(list(chat.children)[-1].render()))
 
+        asyncio.run(check())
+
+    def test_dialog_keeps_chat_visible_and_keyboard_works(self):
+        async def check():
+            app = NanoHarness()
+            async with app.run_test(size=(100, 28)) as pilot:
+                results = []
+                await app.screen.mount(ApprovalDialog("Run sandboxed shell command: $ ls -la", results.append))
+                await pilot.pause()
+                self.assertEqual(app.focused.id, "deny")
+                svg = html.unescape(app.export_screenshot()).replace("\xa0", " ")
+                self.assertIn("NanoHarness is ready", svg)
+                self.assertIn("Approve this action?", svg)
+                await pilot.press("tab")
+                self.assertEqual(app.focused.id, "approve")
+                await pilot.press("tab")
+                self.assertEqual(app.focused.id, "deny")
+                await pilot.press("shift+tab")
+                self.assertEqual(app.focused.id, "approve")
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertEqual(results, [True])
+                await pilot.resize_terminal(64, 20)
+                await app.screen.mount(ApprovalDialog("Run sandboxed shell command: $ ls -la", results.append))
+                await pilot.pause()
+                self.assertLess(app.query_one("#approve").region.y, app.screen.region.bottom)
+                narrow_svg = html.unescape(app.export_screenshot()).replace("\xa0", " ")
+                self.assertIn("NanoHarness ", narrow_svg)
+                self.assertIn(" Deny ", narrow_svg)
+                self.assertIn(" Approve ", narrow_svg)
+                await pilot.press("escape")
+                self.assertEqual(results, [True, False])
         asyncio.run(check())
 
     def test_approval_is_not_model_visible(self):
