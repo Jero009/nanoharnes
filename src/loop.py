@@ -47,6 +47,10 @@ def run_turn(
             delta = chunk.choices[0].delta
             content = getattr(delta, "content", None)
             tool_calls = getattr(delta, "tool_calls", None)
+            reasoning = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
+
+            if reasoning:
+                emit("thinking", reasoning)
 
             if content:
                 emit("assistant", content)

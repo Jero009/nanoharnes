@@ -41,6 +41,11 @@ class NanoHarness(App):
     }
     .user {
         text-style: bold;
+        color: #add8e6;
+    }
+    .thinking {
+        color: #888888;
+        text-style: dim;
     }
     .event {
         color: #aaaaaa;
@@ -111,6 +116,7 @@ class NanoHarness(App):
         self.messages = new_messages()
         self.busy = False
         self.reply = None
+        self.thinking = None
 
     def compose(self) -> ComposeResult:
         yield Static(BANNER, id="banner")
@@ -142,17 +148,24 @@ class NanoHarness(App):
         prompt.disabled = True
         self.query_one("#send", Button).disabled = True
         self.reply = None
+        self.thinking = None
         self.run_agent(text)
 
     def show_event(self, kind: str, text: str) -> None:
         chat = self.query_one("#chat", VerticalScroll)
-        if kind == "assistant":
+        if kind == "thinking":
+            if self.thinking is None:
+                self.thinking = Static("", classes="message thinking", markup=False)
+                chat.mount(self.thinking)
+            self.thinking.update(str(self.thinking.render()) + text)
+        elif kind == "assistant":
             if self.reply is None:
                 self.reply = Static("", classes="message", markup=False)
                 chat.mount(self.reply)
             self.reply.update(str(self.reply.render()) + text)
         else:
             self.reply = None
+            self.thinking = None
             chat.mount(Static(f"{kind}: {text}", classes="message event", markup=False))
         chat.scroll_end()
 

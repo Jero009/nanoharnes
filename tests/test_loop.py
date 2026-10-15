@@ -112,6 +112,26 @@ class LoopTests(unittest.TestCase):
             )
         )
 
+    def test_reasoning_streams_to_ui_but_not_history(self):
+        chunks = [
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(
+                content=None, tool_calls=None, reasoning_content="Let me ",
+            ))]),
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(
+                content=None, tool_calls=None, reasoning="think.",
+            ))]),
+            text_chunk("Answer"),
+        ]
+        emitted = []
+        messages = agent_loop.new_messages()
+        with patch.object(agent_loop.client.chat.completions, "create", return_value=chunks):
+            agent_loop.run_turn(messages, "question", model_name="test-model",
+                                emit=lambda kind, value: emitted.append((kind, value)))
+        self.assertEqual(emitted, [("thinking", "Let me "),
+                                   ("thinking", "think."), ("assistant", "Answer")])
+        self.assertEqual(messages[-1]["content"], "Answer")
+        self.assertNotIn("think", str(messages))
+
     def test_reassembles_tool_arguments_and_sends_result(self):
         requests = self.run_one_turn(
             streams=[

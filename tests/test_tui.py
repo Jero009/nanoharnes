@@ -15,6 +15,8 @@ class TuiTests(unittest.TestCase):
     def test_send_stream_and_resize(self):
         def fake_turn(messages, text, *, emit, **kwargs):
             messages.append({"role": "user", "content": text})
+            emit("thinking", "Checking ")
+            emit("thinking", "context")
             emit("assistant", "Hel")
             emit("assistant", "lo")
 
@@ -29,6 +31,10 @@ class TuiTests(unittest.TestCase):
                     await pilot.pause()
                     chat = app.query_one("#chat", VerticalScroll)
                     self.assertIn("Hello", " ".join(str(child.render()) for child in chat.children))
+                    self.assertEqual(len(chat.query(".thinking")), 1)
+                    self.assertIn("Checking context", str(chat.query_one(".thinking").render()))
+                    self.assertEqual(chat.query_one(".thinking").styles.color.hex, "#888888")
+                    self.assertEqual(chat.query_one(".user").styles.color.hex.lower(), "#add8e6")
                     self.assertEqual(prompt.value, "")
                     self.assertFalse(prompt.disabled)
                     self.assertEqual(turn.call_count, 1)
