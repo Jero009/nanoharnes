@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -98,8 +99,87 @@ class MemoryTests(unittest.TestCase):
         self.seed('{"editor": "VS Code"}')
         original = self.path.read_bytes()
         with self.assertRaises(ValueError):
-            store.create_memory("large", "x" * 100_000, approve=lambda _: True)
+            store.create_memory("large", "x" * 500_000, approve=lambda _: True)
         self.assertEqual(self.path.read_bytes(), original)
+
+    def model(self, keep):
+        calls = []
+        def create(**kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(choices=[SimpleNamespace(
+                message=SimpleNamespace(content=json.dumps({"keep": keep})))])
+        fake = SimpleNamespace(
+            client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))),
+            get_model_name=lambda: "same-model",
+        )
+        return patch.dict(sys.modules, {"config.connection": fake}), calls
+
+    def test_compaction_only_when_oversized_and_approved(self):
+        with patch.object(store, "MAX_MEMORY_BYTES", 80):
+            fake, calls = self.model(["important"])
+            with fake:
+                self.assertFalse(store.compact_memory_if_needed(approve=lambda _: True))
+                self.assertEqual(calls, [])
+                self.seed(json.dumps({"important": "A" * 35, "old": "B" * 35}))
+                approvals = []
+                def approve(description):
+                    approvals.append(description)
+                    return True
+                self.assertTrue(store.compact_memory_if_needed(approve=approve))
+            self.assertEqual(calls[0]["model"], "same-model")
+            self.assertIn("old", approvals[0])
+            self.assertEqual(store.list_memory(), {"important": "A" * 35})
+            backups = list(self.path.parent.glob("memories-backup-*.json"))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(json.loads(backups[0].read_text())["old"], "B" * 35)
+
+    def test_compaction_denial_and_invalid_proposal_do_not_write(self):
+        with patch.object(store, "MAX_MEMORY_BYTES", 80):
+            self.seed(json.dumps({"important": "A" * 35, "old": "B" * 35}))
+            original = self.path.read_bytes()
+            for keep, approve in [(["important"], lambda _: False),
+                                  (["invented"], lambda _: True),
+                                  (["important", "old"], lambda _: True)]:
+                fake, _ = self.model(keep)
+                with fake, self.assertRaises(ValueError):
+                    store.compact_memory_if_needed(approve=approve)
+                self.assertEqual(self.path.read_bytes(), original)
+            self.assertEqual(list(self.path.parent.glob("memories-backup-*.json")), [])
+
+    def test_missing_approval_does_not_contact_model(self):
+        with patch.object(store, "MAX_MEMORY_BYTES", 80):
+            self.seed(json.dumps({"important": "A" * 35, "old": "B" * 35}))
+            original = self.path.read_bytes()
+            fake, calls = self.model(["important"])
+            with fake, self.assertRaises(ValueError):
+                store.compact_memory_if_needed()
+            self.assertEqual(calls, [])
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_legacy_memory_copied_without_deleting_source(self):
+        legacy = self.path.parent / "old.json"
+        new = self.path.parent / "private" / "memories.json"
+        legacy.write_text('{"old": "kept"}', encoding="utf-8")
+        with patch.object(store, "MEMORY_FILE", new), \
+             patch.object(store, "DEFAULT_MEMORY_FILE", new), \
+             patch.object(store, "LEGACY_MEMORY_FILE", legacy):
+            self.assertEqual(store.list_memory(), {"old": "kept"})
+            self.assertEqual(new.read_bytes(), legacy.read_bytes())
+            self.assertTrue(legacy.exists())
+
+    def test_new_fact_is_protected_during_automatic_compaction(self):
+        with patch.object(store, "MAX_MEMORY_BYTES", 80):
+            self.seed(json.dumps({"old": "B" * 35}))
+            original = self.path.read_bytes()
+            fake, calls = self.model(["old"])
+            with fake, self.assertRaises(ValueError):
+                store.create_memory("new", "A" * 35, approve=lambda _: True)
+            self.assertEqual(self.path.read_bytes(), original)
+            fake, calls = self.model(["new"])
+            with fake:
+                store.create_memory("new", "A" * 35, approve=lambda _: True, model_name="active-model")
+            self.assertEqual(calls[0]["model"], "active-model")
+            self.assertEqual(store.list_memory(), {"new": "A" * 35})
 
     def test_failed_atomic_replace_preserves_existing_file(self):
         self.seed('{"editor": "VS Code"}')
