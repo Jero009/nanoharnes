@@ -1,5 +1,6 @@
 import copy
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -76,15 +77,12 @@ class LoopTests(unittest.TestCase):
                 "MAX_TOOL_ROUNDS",
                 max_tool_rounds,
             ),
-            patch.object(
-                agent_loop.console,
-                "input",
-                side_effect=["test request", KeyboardInterrupt()],
-            ),
-            patch.object(agent_loop.console, "print"),
         ):
-            with self.assertRaises(KeyboardInterrupt):
-                agent_loop.loop()
+            agent_loop.run_turn(
+                agent_loop.new_messages(),
+                "test request",
+                model_name="test-model",
+            )
 
         return requests
 
@@ -216,6 +214,25 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(tool_result_message["role"], "tool")
         self.assertEqual(tool_result_message["tool_call_id"], "call_bad_json")
         self.assertIn("not valid JSON", tool_result_message["content"])
+
+    def test_denied_delete_is_returned_to_model(self):
+        from tools import file_tools
+
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "protected.txt"
+            target.write_text("keep", encoding="utf-8")
+            with patch.object(file_tools, "ALLOWED_DIR", Path(directory)):
+                requests = self.run_one_turn(
+                    streams=[
+                        [tool_chunk(index=0, call_id="delete_1", name="delete_file",
+                                    arguments='{"file_path":"protected.txt"}')],
+                        [text_chunk("Denied")],
+                    ],
+                    tool_functions={"delete_file": file_tools.delete_file},
+                )
+            self.assertTrue(target.exists())
+        self.assertEqual(requests[1][-1]["tool_call_id"], "delete_1")
+        self.assertIn("denied", requests[1][-1]["content"])
 
     def test_tool_round_limit_prevents_next_execution(self):
         echo = Mock(return_value="ok")

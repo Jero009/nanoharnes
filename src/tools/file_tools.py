@@ -1,6 +1,6 @@
 from pathlib import Path
+from typing import Callable
 from config import ALLOWED_DIR, MAX_FILE_SIZE_BYTES
-import typer
 
 from config import MAX_OUTPUT_CHARS
 
@@ -89,7 +89,7 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
     return f"File updated ({mode} mode)."
 
 
-def delete_file(file_path: str) -> str:
+def delete_file(file_path: str, *, approve: Callable[[str], bool] | None = None) -> str:
     """Delete a file."""
     requested_path = Path(file_path)
 
@@ -105,10 +105,8 @@ def delete_file(file_path: str) -> str:
     if not path.is_file():
         return f"Error: File not found: {file_path}"
 
-    if not typer.confirm(
-        f" [!]  APPROVAL NEEDED: Agent wants to DELETE file: '{file_path}'. Allow? ",
-        default=False,
-    ):
+    # Never let a model invoke deletion without an explicit human approver.
+    if approve is None or not approve(f"Delete file: {path}"):
         return "Action canceled: User denied deletion request."
 
     path.unlink()

@@ -1,20 +1,16 @@
 import subprocess
 import shutil
-import typer
+from typing import Callable
 from config import ALLOWED_DIR,MAX_OUTPUT_CHARS
 
 
-def execute_command(command: str) -> str:
+def execute_command(command: str, *, approve: Callable[[str], bool] | None = None) -> str:
     """Run a shell command in the isolated workspace. Network is disabled."""
     sandbox = shutil.which("bwrap")
     if sandbox is None:
         return "Error: bubblewrap is required to run shell commands safely."
     #give the user a chance to approve the command before executing it
-    confirm = typer.confirm(
-        f"[!]  [APPROVAL NEEDED] Agent wants to run shell command: $ {command}  Allow? ",
-        default=False,
-    )
-    if not confirm:
+    if approve is None or not approve(f"Run sandboxed shell command: $ {command}"):
         return "Action canceled: User denied command execution."
     try:
         # 2. Give the process a temporary root and expose only the workspace

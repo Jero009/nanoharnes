@@ -2,7 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -133,8 +133,8 @@ class ToolTests(unittest.TestCase):
     def test_delete_file_keeps_file_when_user_denies(self):
         file_tools.create_file("keep.txt", "important")
 
-        with patch("tools.file_tools.typer.confirm", return_value=False) as confirm:
-            result = file_tools.delete_file("keep.txt")
+        confirm = Mock(return_value=False)
+        result = file_tools.delete_file("keep.txt", approve=confirm)
 
         self.assertEqual(result, "Action canceled: User denied deletion request.")
         self.assertTrue((self.workspace / "keep.txt").exists())
@@ -143,8 +143,8 @@ class ToolTests(unittest.TestCase):
     def test_delete_file_removes_file_when_user_approves(self):
         file_tools.create_file("remove.txt", "temporary")
 
-        with patch("tools.file_tools.typer.confirm", return_value=True) as confirm:
-            result = file_tools.delete_file("remove.txt")
+        confirm = Mock(return_value=True)
+        result = file_tools.delete_file("remove.txt", approve=confirm)
 
         self.assertEqual(result, "File deleted: remove.txt")
         self.assertFalse((self.workspace / "remove.txt").exists())
@@ -242,35 +242,35 @@ class ToolTests(unittest.TestCase):
         self.assertFalse((self.workspace.parent / "outside").exists())
 
     def test_shell_runs_inside_workspace(self):
-        with patch("tools.shell_tools.typer.confirm", return_value=True) as confirm:
-            result = shell_tools.execute_command("pwd")
+        confirm = Mock(return_value=True)
+        result = shell_tools.execute_command("pwd", approve=confirm)
 
         self.assertIn("/workspace", result)
         confirm.assert_called_once()
 
     def test_shell_can_create_workspace_file(self):
-        with patch("tools.shell_tools.typer.confirm", return_value=True) as confirm:
-            result = shell_tools.execute_command("touch created-by-shell.txt")
+        confirm = Mock(return_value=True)
+        result = shell_tools.execute_command("touch created-by-shell.txt", approve=confirm)
 
         self.assertIn("Exit Code: 0", result)
         self.assertTrue((self.workspace / "created-by-shell.txt").exists())
         confirm.assert_called_once()
 
     def test_shell_output_is_truncated(self):
-        with patch("tools.shell_tools.typer.confirm", return_value=True) as confirm:
-            result = shell_tools.execute_command(
-                "python3 -c \"print('x' * 500)\""
-            )
+        confirm = Mock(return_value=True)
+        result = shell_tools.execute_command(
+            "python3 -c \"print('x' * 500)\"", approve=confirm
+        )
 
         self.assertIn("[TRUNCATED:", result)
         self.assertLessEqual(len(result), 200)
         confirm.assert_called_once()
 
     def test_shell_does_not_run_when_user_denies(self):
-        with patch("tools.shell_tools.typer.confirm", return_value=False) as confirm:
-            result = shell_tools.execute_command(
-                "touch should-not-exist.txt"
-            )
+        confirm = Mock(return_value=False)
+        result = shell_tools.execute_command(
+            "touch should-not-exist.txt", approve=confirm
+        )
 
         self.assertFalse(
             (self.workspace / "should-not-exist.txt").exists()
@@ -282,8 +282,8 @@ class ToolTests(unittest.TestCase):
         target = self.workspace / "protected.txt"
         target.write_text("keep me", encoding="utf-8")
 
-        with patch("tools.shell_tools.typer.confirm", return_value=False) as confirm:
-            result = shell_tools.execute_command("rm protected.txt")
+        confirm = Mock(return_value=False)
+        result = shell_tools.execute_command("rm protected.txt", approve=confirm)
 
         self.assertTrue(target.exists())
         self.assertIn("denied", result.lower())
