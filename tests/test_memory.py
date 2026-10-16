@@ -7,10 +7,16 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-import memory as store
+from memory import memory as store
+import memory
 
 
 class MemoryTests(unittest.TestCase):
+    def test_package_exports_memory_functions(self):
+        for name in ("get_memory", "list_memory", "create_memory", "update_memory",
+                     "delete_memory", "compact_memory_if_needed"):
+            self.assertIs(getattr(memory, name), getattr(store, name))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
