@@ -54,23 +54,18 @@ class MemoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.list_memory()
 
-    def test_create_requires_approval_and_does_not_overwrite(self):
-        self.assertIn("denied", store.create_memory("editor", "VS Code").lower())
-        self.assertFalse(self.path.exists())
-        self.assertIn("created", store.create_memory("editor", "VS Code", approve=lambda _: True).lower())
+    def test_create_without_approval_and_does_not_overwrite(self):
+        self.assertIn("created", store.create_memory("editor", "VS Code").lower())
         self.assertEqual(store.list_memory(), {"editor": "VS Code"})
-        self.assertIn("already exists", store.create_memory("editor", "Vim", approve=lambda _: True))
+        self.assertIn("already exists", store.create_memory("editor", "Vim"))
         self.assertEqual(store.get_memory("editor"), "VS Code")
 
-    def test_update_requires_existing_key_and_approval(self):
-        self.assertIn("not found", store.update_memory("editor", "Vim", approve=lambda _: True))
-        store.create_memory("editor", "VS Code", approve=lambda _: True)
+    def test_update_requires_existing_key_but_not_approval(self):
+        self.assertIn("not found", store.update_memory("editor", "Vim"))
+        store.create_memory("editor", "VS Code")
         requests = []
-        self.assertIn("denied", store.update_memory("editor", "Vim", approve=lambda text: requests.append(text) or False).lower())
-        self.assertIn("VS Code", requests[0])
-        self.assertIn("Vim", requests[0])
-        self.assertEqual(store.get_memory("editor"), "VS Code")
-        self.assertIn("updated", store.update_memory("editor", "Vim", approve=lambda _: True).lower())
+        self.assertIn("updated", store.update_memory("editor", "Vim", approve=lambda text: requests.append(text) or False).lower())
+        self.assertEqual(requests, [])
         self.assertEqual(store.get_memory("editor"), "Vim")
 
     def test_delete_requires_existing_key_and_approval(self):
@@ -81,12 +76,13 @@ class MemoryTests(unittest.TestCase):
         self.assertIn("deleted", store.delete_memory("editor", approve=lambda _: True).lower())
         self.assertEqual(store.list_memory(), {})
 
-    def test_approval_failure_defaults_to_denial(self):
+    def test_delete_approval_failure_defaults_to_denial(self):
         def broken(_):
             raise RuntimeError("dialog closed")
 
-        self.assertIn("denied", store.create_memory("editor", "VS Code", approve=broken).lower())
-        self.assertFalse(self.path.exists())
+        store.create_memory("editor", "VS Code")
+        self.assertIn("denied", store.delete_memory("editor", approve=broken).lower())
+        self.assertEqual(store.get_memory("editor"), "VS Code")
 
     def test_rejects_blank_keys_and_values(self):
         with self.assertRaises(ValueError):
@@ -145,6 +141,9 @@ class MemoryTests(unittest.TestCase):
             original = self.path.read_bytes()
             for keep, approve in [(["important"], lambda _: False),
                                   (["invented"], lambda _: True),
+                                  (["important", "important"], lambda _: True),
+                                  ([123], lambda _: True),
+                                  ([], lambda _: True),
                                   (["important", "old"], lambda _: True)]:
                 fake, _ = self.model(keep)
                 with fake, self.assertRaises(ValueError):
@@ -175,6 +174,20 @@ class MemoryTests(unittest.TestCase):
                 store.create_memory("new", "A" * 35, approve=lambda _: True, model_name="active-model")
             self.assertEqual(calls[0]["model"], "active-model")
             self.assertEqual(store.list_memory(), {"new": "A" * 35})
+
+    def test_automatic_write_does_not_delete_facts_without_compaction_approval(self):
+        with patch.object(store, "MAX_MEMORY_BYTES", 80):
+            self.seed(json.dumps({"old": "B" * 35}))
+            original = self.path.read_bytes()
+            fake, calls = self.model(["new"])
+            with fake, self.assertRaises(ValueError):
+                store.create_memory("new", "A" * 35)
+            self.assertEqual(calls, [])
+            self.assertEqual(self.path.read_bytes(), original)
+
+            with fake, self.assertRaisesRegex(ValueError, "compaction denied"):
+                store.create_memory("new", "A" * 35, approve=lambda _: False)
+            self.assertEqual(self.path.read_bytes(), original)
 
     def test_failed_atomic_replace_preserves_existing_file(self):
         self.seed('{"editor": "VS Code"}')

@@ -275,27 +275,29 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(requests[1][-1]["tool_call_id"], "memory_1")
         self.assertIn("created", requests[1][-1]["content"].lower())
 
-    def test_denied_memory_creation_leaves_no_file(self):
+    def test_memory_creation_does_not_request_approval(self):
         from memory import memory as store
         from tools import TOOL_FUNCTIONS
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "memories.json"
+            approvals = []
             with patch.object(store, "MEMORY_FILE", path):
                 requests = self.run_one_turn(
                     streams=[
-                        [tool_chunk(index=0, call_id="memory_deny", name="create_memory",
+                        [tool_chunk(index=0, call_id="memory_create", name="create_memory",
                                     arguments='{"key":"name","value":"Jerney"}')],
-                        [text_chunk("Denied")],
+                        [text_chunk("Remembered")],
                     ],
                     tool_functions={"create_memory": TOOL_FUNCTIONS["create_memory"]},
-                    approve=lambda _: False,
+                    approve=lambda description: approvals.append(description) or False,
                 )
-                self.assertFalse(path.exists())
-        self.assertEqual(requests[1][-1]["tool_call_id"], "memory_deny")
-        self.assertIn("denied", requests[1][-1]["content"].lower())
+                self.assertEqual(store.get_memory("name"), "Jerney")
+        self.assertEqual(approvals, [])
+        self.assertEqual(requests[1][-1]["tool_call_id"], "memory_create")
+        self.assertIn("created", requests[1][-1]["content"].lower())
 
-    def test_memory_updates_and_deletes_use_approval(self):
+    def test_memory_updates_are_automatic_but_deletes_need_approval(self):
         from memory import memory as store
         from tools import TOOL_FUNCTIONS
 
@@ -304,12 +306,12 @@ class LoopTests(unittest.TestCase):
             with patch.object(store, "MEMORY_FILE", path):
                 path.write_text('{"name":"Jerney"}', encoding="utf-8")
                 for name, arguments, approved, expected in (
-                    ("update_memory", '{"key":"name","value":"Jernej"}', False, "Jerney"),
-                    ("update_memory", '{"key":"name","value":"Jernej"}', True, "Jernej"),
+                    ("update_memory", '{"key":"name","value":"Jernej"}', False, "Jernej"),
                     ("delete_memory", '{"key":"name"}', False, "Jernej"),
                     ("delete_memory", '{"key":"name"}', True, None),
                 ):
                     with self.subTest(name=name, approved=approved):
+                        approvals = []
                         requests = self.run_one_turn(
                             streams=[
                                 [tool_chunk(index=0, call_id="memory_action", name=name,
@@ -317,10 +319,11 @@ class LoopTests(unittest.TestCase):
                                 [text_chunk("Done")],
                             ],
                             tool_functions={name: TOOL_FUNCTIONS[name]},
-                            approve=lambda _, decision=approved: decision,
+                            approve=lambda description, decision=approved: approvals.append(description) or decision,
                         )
                         self.assertEqual(store.get_memory("name"), expected)
                         self.assertEqual(requests[1][-1]["tool_call_id"], "memory_action")
+                        self.assertEqual(len(approvals), 0 if name == "update_memory" else 1)
 
     def test_memory_tool_schema_does_not_advertise_runtime_arguments(self):
         from tools import TOOLS

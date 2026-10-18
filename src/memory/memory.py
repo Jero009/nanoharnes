@@ -86,22 +86,37 @@ def _model_compaction(
         proposal = json.loads(reply)
     except (AttributeError, IndexError, TypeError, json.JSONDecodeError) as error:
         raise ValueError("Model returned invalid compaction JSON; memory unchanged.") from error
-    keep = proposal.get("keep") if isinstance(proposal, dict) else None
-    if (not isinstance(keep, list) or not keep or
-            any(not isinstance(key, str) or key not in data for key in keep) or
-            len(keep) != len(set(keep)) or (protected is not None and protected not in keep)):
+
+    if not isinstance(proposal, dict):
         raise ValueError("Model returned invalid keys; memory unchanged.")
+    keep = proposal.get("keep")
+    if not isinstance(keep, list) or not keep:
+        raise ValueError("Model returned invalid keys; memory unchanged.")
+    if any(not isinstance(key, str) or key not in data for key in keep):
+        raise ValueError("Model returned invalid keys; memory unchanged.")
+    if len(keep) != len(set(keep)):
+        raise ValueError("Model returned duplicate keys; memory unchanged.")
+    if protected is not None and protected not in keep:
+        raise ValueError("Model dropped the new fact; memory unchanged.")
+
     kept = {key: value for key, value in data.items() if key in keep}
     removed = [key for key in data if key not in kept]
-    if not removed or len(_encoded(kept)) > MAX_MEMORY_BYTES:
+    if not removed:
         raise ValueError("Model did not reduce memory enough; memory unchanged.")
-    if not _approved(f"Delete these memory keys: {', '.join(repr(k) for k in removed)}", approve):
+    if len(_encoded(kept)) > MAX_MEMORY_BYTES:
+        raise ValueError("Model did not reduce memory enough; memory unchanged.")
+
+    description = f"Delete these memory keys: {', '.join(repr(key) for key in removed)}"
+    if not _approved(description, approve):
         raise ValueError("Memory compaction denied; memory unchanged.")
+
     # Keep a recovery copy, including a newly approved fact not yet persisted.
     MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(mode="wb", dir=MEMORY_FILE.parent,
-                                     prefix=f"memories-backup-{uuid4().hex}-",
-                                     suffix=".json", delete=False) as backup:
+    with tempfile.NamedTemporaryFile(
+        mode="wb", dir=MEMORY_FILE.parent,
+        prefix=f"memories-backup-{uuid4().hex}-",
+        suffix=".json", delete=False,
+    ) as backup:
         backup.write(_encoded(data))
     return kept
 
@@ -139,14 +154,12 @@ def create_memory(
     key: str, value: str, *, approve: Callable[[str], bool] | None = None,
     model_name: str | None = None,
 ) -> str:
-    """Save a new fact only after explicit approval; never overwrite."""
+    """Save a new fact without overwriting an existing key."""
     if not key.strip() or not value.strip():
         raise ValueError("Memory key and value cannot be empty.")
     data = list_memory()
     if key in data:
         return f"Memory key already exists: {key}"
-    if not _approved(f"Create memory {key!r}: {value!r}", approve):
-        return "Memory creation denied."
     data[key] = value
     _write_memory(data, approve=approve, model_name=model_name, protected=key)
     return f"Memory created: {key}"
@@ -154,14 +167,12 @@ def update_memory(
     key: str, value: str, *, approve: Callable[[str], bool] | None = None,
     model_name: str | None = None,
 ) -> str:
-    """Change an existing fact only after explicit approval."""
+    """Change an existing fact without creating a missing key."""
     if not key.strip() or not value.strip():
         raise ValueError("Memory key and value cannot be empty.")
     data = list_memory()
     if key not in data:
         return f"Memory key not found: {key}"
-    if not _approved(f"Update memory {key!r}: {data[key]!r} -> {value!r}", approve):
-        return "Memory update denied."
     data[key] = value
     _write_memory(data, approve=approve, model_name=model_name, protected=key)
     return f"Memory updated: {key}"
