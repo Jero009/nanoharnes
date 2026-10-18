@@ -1,7 +1,10 @@
 import inspect
+
+from memory import create_memory, delete_memory, get_memory, list_memory, update_memory
 from .file_tools import edit_file, read_file, create_file,delete_file, rename_file, get_file_length,read_lines
 from .dir_tools import pwd, ls, mkdir
 from .shell_tools import execute_command
+
 
 FUNCTIONS = [
     read_file,
@@ -14,7 +17,13 @@ FUNCTIONS = [
     ls,
     mkdir,
     execute_command,
-    read_lines
+    read_lines,
+    create_memory,
+    delete_memory,
+    get_memory,
+    list_memory,
+    update_memory,
+
 ]
 TOOL_FUNCTIONS = {
     function.__name__: function
