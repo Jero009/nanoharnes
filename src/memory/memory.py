@@ -41,10 +41,7 @@ def _load_memory(max_bytes: int) -> dict[str, str]:
     return data
 
 
-def compact_memory_if_needed(
-    *, approve: Callable[[str], bool] | None = None,
-    model_name: str | None = None,
-) -> bool:
+def compact_memory_if_needed(*, approve: Callable[[str], bool] | None = None,model_name: str | None = None,) -> bool:
     """Ask the configured model to trim an oversized store, pending approval."""
     try:
         if MEMORY_FILE.stat().st_size <= MAX_MEMORY_BYTES:
@@ -56,10 +53,8 @@ def compact_memory_if_needed(
     return True
 
 
-def _model_compaction(
-    data: dict[str, str], approve: Callable[[str], bool] | None,
-    model_name: str | None, protected: str | None,
-) -> dict[str, str]:
+def _model_compaction(data: dict[str, str], approve: Callable[[str], bool] | None,model_name: str | None, protected: str | None,) -> dict[str, str]:
+   
     if approve is None:
         raise ValueError("Memory compaction requires an approval provider.")
     from config.connection import client, get_model_name
@@ -121,10 +116,8 @@ def _model_compaction(
     return kept
 
 
-def _write_memory(
-    data: dict[str, str], *, approve: Callable[[str], bool] | None = None,
-    model_name: str | None = None, protected: str | None = None,
-) -> None:
+def _write_memory(data: dict[str, str], *, approve: Callable[[str], bool] | None = None,model_name: str | None = None, protected: str | None = None,) -> None:
+   
     """Replace the entire store without exposing a partially written file."""
     MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
     content = _encoded(data)
@@ -145,15 +138,15 @@ def _write_memory(
     finally:
         if temp_name and os.path.exists(temp_name):
             os.unlink(temp_name)
+
 def _approved(description: str, approve: Callable[[str], bool] | None) -> bool:
     try:
         return approve is not None and approve(description) is True
     except Exception:
         return False
-def create_memory(
-    key: str, value: str, *, approve: Callable[[str], bool] | None = None,
-    model_name: str | None = None,
-) -> str:
+    
+def create_memory(key: str, value: str, *, approve: Callable[[str], bool] | None = None,model_name: str | None = None,) -> str:
+
     """Save a new fact without overwriting an existing key."""
     if not key.strip() or not value.strip():
         raise ValueError("Memory key and value cannot be empty.")
@@ -163,10 +156,9 @@ def create_memory(
     data[key] = value
     _write_memory(data, approve=approve, model_name=model_name, protected=key)
     return f"Memory created: {key}"
-def update_memory(
-    key: str, value: str, *, approve: Callable[[str], bool] | None = None,
-    model_name: str | None = None,
-) -> str:
+
+def update_memory(key: str, value: str, *, approve: Callable[[str], bool] | None = None,model_name: str | None = None,) -> str:
+
     """Change an existing fact without creating a missing key."""
     if not key.strip() or not value.strip():
         raise ValueError("Memory key and value cannot be empty.")
@@ -176,9 +168,9 @@ def update_memory(
     data[key] = value
     _write_memory(data, approve=approve, model_name=model_name, protected=key)
     return f"Memory updated: {key}"
-def delete_memory(
-    key: str, *, approve: Callable[[str], bool] | None = None,
-) -> str:
+
+def delete_memory(key: str, *, approve: Callable[[str], bool] | None = None,) -> str:
+
     """Delete an existing fact only after explicit approval."""
     if not key.strip():
         raise ValueError("Memory key cannot be empty.")

@@ -8,10 +8,10 @@ from textual.widgets import Button, Input, Static
 
 from loop import new_messages, run_turn
 BANNER = r"""[bold]
-  _  _   _   _  _  ___     _   ___ ___ _  _ _____
- | \| | /_\ | \| |/ _ \   /_\ / __| __| \| |_   _|
- |    |/ _ \|    | (_) | / _ \ (_ | _||    | | |
- |_|\_/_/ \_\_|\_|\___/ /_/ \_\___|___|_|\_| |_|
+  _  _   _   _  _  ___    _   ___ ___ _  _ _____
+ | \| | /_\ | \| |/ _ \  /_\ / __| __| \| |_   _|
+ |    |/ _ \|    | (_) |/ _ \ (_ | _||    | | |
+ |_|\_/_/ \_\_|\_|\___//_/ \_\___|___|_|\_| |_|
 [/bold]
 [dim]           Local Agent Harness           [/dim]"""
 class NanoHarness(App):
