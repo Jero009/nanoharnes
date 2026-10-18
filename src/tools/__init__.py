@@ -42,7 +42,7 @@ def function_to_schema(func):
         bool: "boolean",
     }
     for parameter_name, parameter in signature.parameters.items():
-        if parameter_name == "approve":
+        if parameter_name in ("approve", "model_name"):
             continue
         parameter_type = type_map.get(parameter.annotation, "string")
         properties[parameter_name] = {

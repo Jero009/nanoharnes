@@ -51,7 +51,7 @@ def tool_chunk(
     )
 
 class LoopTests(unittest.TestCase):
-    def run_one_turn(self, streams, tool_functions=None, max_tool_rounds=5):
+    def run_one_turn(self, streams, tool_functions=None, max_tool_rounds=5, approve=None):
         requests = []
         stream_iterator = iter(streams)
 
@@ -82,6 +82,7 @@ class LoopTests(unittest.TestCase):
                 agent_loop.new_messages(),
                 "test request",
                 model_name="test-model",
+                approve=approve,
             )
 
         return requests
@@ -253,6 +254,83 @@ class LoopTests(unittest.TestCase):
             self.assertTrue(target.exists())
         self.assertEqual(requests[1][-1]["tool_call_id"], "delete_1")
         self.assertIn("denied", requests[1][-1]["content"])
+
+    def test_approved_memory_creation_writes_and_returns_result(self):
+        from memory import memory as store
+        from tools import TOOL_FUNCTIONS
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "memories.json"
+            with patch.object(store, "MEMORY_FILE", path):
+                requests = self.run_one_turn(
+                    streams=[
+                        [tool_chunk(index=0, call_id="memory_1", name="create_memory",
+                                    arguments='{"key":"name","value":"Jerney"}')],
+                        [text_chunk("Remembered")],
+                    ],
+                    tool_functions={"create_memory": TOOL_FUNCTIONS["create_memory"]},
+                    approve=lambda _: True,
+                )
+                self.assertEqual(store.get_memory("name"), "Jerney")
+        self.assertEqual(requests[1][-1]["tool_call_id"], "memory_1")
+        self.assertIn("created", requests[1][-1]["content"].lower())
+
+    def test_denied_memory_creation_leaves_no_file(self):
+        from memory import memory as store
+        from tools import TOOL_FUNCTIONS
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "memories.json"
+            with patch.object(store, "MEMORY_FILE", path):
+                requests = self.run_one_turn(
+                    streams=[
+                        [tool_chunk(index=0, call_id="memory_deny", name="create_memory",
+                                    arguments='{"key":"name","value":"Jerney"}')],
+                        [text_chunk("Denied")],
+                    ],
+                    tool_functions={"create_memory": TOOL_FUNCTIONS["create_memory"]},
+                    approve=lambda _: False,
+                )
+                self.assertFalse(path.exists())
+        self.assertEqual(requests[1][-1]["tool_call_id"], "memory_deny")
+        self.assertIn("denied", requests[1][-1]["content"].lower())
+
+    def test_memory_updates_and_deletes_use_approval(self):
+        from memory import memory as store
+        from tools import TOOL_FUNCTIONS
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "memories.json"
+            with patch.object(store, "MEMORY_FILE", path):
+                path.write_text('{"name":"Jerney"}', encoding="utf-8")
+                for name, arguments, approved, expected in (
+                    ("update_memory", '{"key":"name","value":"Jernej"}', False, "Jerney"),
+                    ("update_memory", '{"key":"name","value":"Jernej"}', True, "Jernej"),
+                    ("delete_memory", '{"key":"name"}', False, "Jernej"),
+                    ("delete_memory", '{"key":"name"}', True, None),
+                ):
+                    with self.subTest(name=name, approved=approved):
+                        requests = self.run_one_turn(
+                            streams=[
+                                [tool_chunk(index=0, call_id="memory_action", name=name,
+                                            arguments=arguments)],
+                                [text_chunk("Done")],
+                            ],
+                            tool_functions={name: TOOL_FUNCTIONS[name]},
+                            approve=lambda _, decision=approved: decision,
+                        )
+                        self.assertEqual(store.get_memory("name"), expected)
+                        self.assertEqual(requests[1][-1]["tool_call_id"], "memory_action")
+
+    def test_memory_tool_schema_does_not_advertise_runtime_arguments(self):
+        from tools import TOOLS
+
+        for schema in TOOLS:
+            if schema["function"]["name"] in ("create_memory", "update_memory", "delete_memory"):
+                with self.subTest(tool=schema["function"]["name"]):
+                    properties = schema["function"]["parameters"]["properties"]
+                    self.assertNotIn("approve", properties)
+                    self.assertNotIn("model_name", properties)
 
     def test_tool_round_limit_prevents_next_execution(self):
         echo = Mock(return_value="ok")

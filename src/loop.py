@@ -111,6 +111,10 @@ def run_turn(
                     result = f"Error: tool '{tool_name}' is not allowed."
                 elif tool_name in ("delete_file", "execute_command"):
                     result = tool_function(**arguments, approve=approve)
+                elif tool_name in ("create_memory", "update_memory"):
+                    result = tool_function(**arguments, approve=approve, model_name=model_name)
+                elif tool_name == "delete_memory":
+                    result = tool_function(**arguments, approve=approve)
                 else:
                     result = tool_function(**arguments)
             except json.JSONDecodeError:
