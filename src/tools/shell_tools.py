@@ -1,5 +1,8 @@
 import subprocess
 import shutil
+import os
+import selectors
+import time
 from typing import Callable
 from config import ALLOWED_DIR,MAX_OUTPUT_CHARS
 
@@ -34,17 +37,46 @@ def execute_command(command: str, *, approve: Callable[[str], bool] | None = Non
             "--", "/bin/sh", "-c", command,
         ]
 
-        result = subprocess.run(
-            sandbox_command,
-            shell=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        # Read at most the configured output budget; never buffer an entire
+        # untrusted command's output before truncating it.
+        output_chunks = {"stdout": bytearray(), "stderr": bytearray()}
+        truncated = False
+        deadline = time.monotonic() + 30
+        with subprocess.Popen(
+            sandbox_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env={"PATH": "/usr/bin:/bin", "HOME": "/workspace", "LANG": "C.UTF-8"},
+        ) as process:
+            try:
+                with selectors.DefaultSelector() as selector:
+                    selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+                    selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+                    while selector.get_map():
+                        remaining_time = deadline - time.monotonic()
+                        if remaining_time <= 0:
+                            raise subprocess.TimeoutExpired(sandbox_command, 30)
+                        ready = selector.select(remaining_time)
+                        if not ready:
+                            raise subprocess.TimeoutExpired(sandbox_command, 30)
+                        for key, _ in ready:
+                            remaining = MAX_OUTPUT_CHARS - sum(map(len, output_chunks.values()))
+                            chunk = os.read(key.fileobj.fileno(), min(4096, remaining + 1))
+                            if not chunk:
+                                selector.unregister(key.fileobj)
+                                continue
+                            output_chunks[key.data].extend(chunk[:remaining])
+                            if len(chunk) > remaining:
+                                truncated = True
+                                break
+                        if truncated:
+                            break
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.wait()
+            exit_code = process.returncode
 
-        stdout = result.stdout.strip()
-        stderr = result.stderr.strip()
-        exit_code = result.returncode
+        stdout = output_chunks["stdout"].decode("utf-8", errors="replace").strip()
+        stderr = output_chunks["stderr"].decode("utf-8", errors="replace").strip()
 
         # Format readable output
         parts = [f"Exit Code: {exit_code}"]
@@ -58,7 +90,7 @@ def execute_command(command: str, *, approve: Callable[[str], bool] | None = Non
         output = "\n\n".join(parts)
 
         # 3. Output truncation: protect memory from runaway log commands
-        if len(output) > MAX_OUTPUT_CHARS:
+        if truncated or len(output) > MAX_OUTPUT_CHARS:
             output = (
                 output[:MAX_OUTPUT_CHARS]
                 + f"\n\n...[TRUNCATED: Output exceeded {MAX_OUTPUT_CHARS} characters limit]..."

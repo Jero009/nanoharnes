@@ -9,7 +9,8 @@ from unittest.mock import Mock, patch
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-import loop as agent_loop
+with patch.dict("os.environ", {"BASE_URL": "http://127.0.0.1:1/v1", "API_KEY": "test"}):
+    import loop as agent_loop
 
 def text_chunk(content: str, finish_reason: str | None = "stop"):
     return SimpleNamespace(

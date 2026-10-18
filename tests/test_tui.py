@@ -8,7 +8,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from textual.widgets import Input
 from textual.containers import VerticalScroll
-from tui import NanoHarness, ApprovalDialog
+with patch.dict("os.environ", {"BASE_URL": "http://127.0.0.1:1/v1", "API_KEY": "test"}):
+    from tui import NanoHarness, ApprovalDialog
 from tools import TOOLS
 
 

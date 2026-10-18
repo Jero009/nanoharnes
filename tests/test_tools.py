@@ -58,6 +58,12 @@ class ToolTests(unittest.TestCase):
             "first",
         )
 
+    def test_create_file_rejects_oversized_utf8_content_before_writing(self):
+        with patch.object(file_tools, "MAX_FILE_SIZE_BYTES", 4):
+            result = file_tools.create_file("nested/oversized.txt", "ééé")
+        self.assertIn("too large", result.lower())
+        self.assertFalse((self.workspace / "nested").exists())
+
     def test_read_file_returns_content(self):
         (self.workspace / "note.txt").write_text("hello", encoding="utf-8")
 
@@ -129,6 +135,14 @@ class ToolTests(unittest.TestCase):
             (self.workspace / "notes.txt").read_text(encoding="utf-8"),
             "hello",
         )
+
+    def test_edit_rejects_oversized_overwrite_and_append_without_changing_file(self):
+        target = self.workspace / "notes.txt"
+        target.write_text("hello", encoding="utf-8")
+        with patch.object(file_tools, "MAX_FILE_SIZE_BYTES", 6):
+            self.assertIn("too large", file_tools.edit_file("notes.txt", "éééé").lower())
+            self.assertIn("too large", file_tools.edit_file("notes.txt", "é", mode="append").lower())
+        self.assertEqual(target.read_text(encoding="utf-8"), "hello")
 
     def test_delete_file_keeps_file_when_user_denies(self):
         file_tools.create_file("keep.txt", "important")
@@ -265,6 +279,37 @@ class ToolTests(unittest.TestCase):
         self.assertIn("[TRUNCATED:", result)
         self.assertLessEqual(len(result), 200)
         confirm.assert_called_once()
+
+    def test_shell_stops_process_when_output_limit_is_reached(self):
+        result = shell_tools.execute_command(
+            "python3 -c \"import sys,time; print('x'*1000000); "
+            "sys.stdout.flush(); time.sleep(2); open('late.txt','w').write('ran')\"",
+            approve=lambda _: True,
+        )
+        self.assertIn("[TRUNCATED:", result)
+        self.assertFalse((self.workspace / "late.txt").exists())
+
+    def test_shell_cannot_read_host_file_or_use_network(self):
+        with tempfile.TemporaryDirectory() as outside_dir:
+            outside = Path(outside_dir) / "host-secret.txt"
+            outside.write_text("hidden", encoding="utf-8")
+            result = shell_tools.execute_command(f"cat {outside}", approve=lambda _: True)
+            self.assertNotIn("hidden", result)
+            self.assertIn("Exit Code:", result)
+
+        result = shell_tools.execute_command(
+            "python3 -c 'import socket; socket.create_connection((\"1.1.1.1\", 53), timeout=2)'", approve=lambda _: True,
+        )
+        self.assertNotIn("Exit Code: 0", result)
+
+    def test_shell_does_not_inherit_agent_secrets(self):
+        with patch.dict("os.environ", {"NANOHARNESS_TEST_SECRET": "do-not-expose"}):
+            result = shell_tools.execute_command(
+                "python3 -c 'import os; print(os.getenv(\"NANOHARNESS_TEST_SECRET\", \"absent\"))'",
+                approve=lambda _: True,
+            )
+        self.assertIn("absent", result)
+        self.assertNotIn("do-not-expose", result)
 
     def test_shell_does_not_run_when_user_denies(self):
         confirm = Mock(return_value=False)

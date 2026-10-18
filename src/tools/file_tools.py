@@ -48,6 +48,8 @@ def read_file(file_path: str) -> str:
 
 def create_file(file_path: str, content: str = "") -> str:
     """Create a new file. Parent folders are created automatically."""
+    if len(content.encode("utf-8")) > MAX_FILE_SIZE_BYTES:
+        return "Error: File content is too large."
     target_path = (ALLOWED_DIR / file_path).resolve()
 
     error = check_path_allowed(target_path)
@@ -78,6 +80,11 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
         return f"Error: Invalid mode '{mode}'. Use 'overwrite' or 'append'."
 
     try:
+        size = len(content.encode("utf-8"))
+        if mode == "append":
+            size += target_path.stat().st_size
+        if size > MAX_FILE_SIZE_BYTES:
+            return "Error: File content is too large."
         if mode == "append":
             with target_path.open("a", encoding="utf-8") as f:
                 f.write(content)

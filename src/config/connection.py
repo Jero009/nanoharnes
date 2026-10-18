@@ -3,8 +3,12 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 load_dotenv()
-
-client = OpenAI(base_url=os.environ["BASE_URL"],api_key=os.environ["API_KEY"]) # establish a connection to the API server
+missing = [name for name in ("BASE_URL", "API_KEY") if not os.getenv(name)]
+if missing:
+    raise SystemExit(
+        f"NanoHarness needs {', '.join(missing)}. See README.md for setup."
+    )
+client = OpenAI(base_url=os.environ["BASE_URL"], api_key=os.environ["API_KEY"])
 
 def get_model_name() -> str:
     models = client.models.list().data
