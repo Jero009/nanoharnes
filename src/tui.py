@@ -55,7 +55,6 @@ class NanoHarness(App):
         height: auto;
         padding: 0 2 1 2;
         background: ansi_default;
-        border-top: solid #555555;
     }
     #composer {
         height: 3;
@@ -68,22 +67,6 @@ class NanoHarness(App):
         border: solid #777777;
     }
     #prompt:focus {
-        border: solid white;
-    }
-    #send {
-        width: 5;
-        min-width: 5;
-        height: 1;
-        min-height: 1;
-        margin-left: 1;
-        background: ansi_default;
-        color: ansi_default;
-        border: none;
-        text-style: bold;
-    }
-    #send:hover, #send:focus {
-        background: ansi_default;
-        color: ansi_default;
         border: solid white;
     }
     #hint {
@@ -152,7 +135,6 @@ class NanoHarness(App):
         with Vertical(id="bottom"):
             with Horizontal(id="composer"):
                 yield Input(placeholder="Message NanoHarness…", id="prompt")
-                yield Button("↵", id="send")
             yield Static("Enter send · Ctrl+L new chat · /help commands", id="hint")
     async def send_message(self) -> None:
         if self.busy:
@@ -181,7 +163,6 @@ class NanoHarness(App):
         chat.scroll_end()
         self.busy = True
         prompt.disabled = True
-        self.query_one("#send", Button).disabled = True
         self.reply = None
         self.thinking = None
         self.run_agent(text)
@@ -238,13 +219,9 @@ class NanoHarness(App):
         self.busy = False
         prompt = self.query_one("#prompt", Input)
         prompt.disabled = False
-        self.query_one("#send", Button).disabled = False
         prompt.focus()
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         await self.send_message()
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "send":
-            await self.send_message()
     async def action_clear_chat(self) -> None:
         if self.busy:
             return

@@ -14,6 +14,17 @@ from tools import TOOLS
 
 
 class TuiTests(unittest.TestCase):
+    def test_composer_uses_enter_without_send_button_or_chat_divider(self):
+        async def check():
+            app = NanoHarness()
+            async with app.run_test(size=(100, 28)):
+                self.assertEqual(len(app.query("#send")), 0)
+                self.assertFalse(app.query_one("#bottom").styles.border)
+                self.assertEqual(app.query_one("#prompt", Input).region.width,
+                                 app.query_one("#composer").region.width)
+
+        asyncio.run(check())
+
     def test_send_stream_and_resize(self):
         def fake_turn(messages, text, *, emit, **kwargs):
             messages.append({"role": "user", "content": text})

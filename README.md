@@ -35,4 +35,4 @@ The default output cap is 4,096 tokens per model request. A token-limit response
 uv run python -m unittest discover -s tests -v
 ```
 
-The shell tests execute real bubblewrap commands on Linux. A model smoke test needs a running server: ask a normal question, request a safe workspace tool, save and retrieve a memory after restart, deny and approve a deletion, then trigger a token limit and retry in the same chat. Check the visible result rather than assuming a successful tool call.
+The shell tests execute real bubblewrap commands on Linux. See [the 1.0 test plan](docs/TEST_PLAN.md) and [latest audit results](docs/TEST_RESULTS.md) for the remaining regression cases and disposable-checkout acceptance checks. Check actual tool results and stored data rather than assuming a successful tool call.
