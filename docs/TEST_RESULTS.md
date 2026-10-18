@@ -1,6 +1,6 @@
 # NanoHarness 1.0 test results (pre-release audit)
 
-Source under test: `main` at `cdbb86a` plus the local send-button/divider removal. This is **not** a 1.0 certification. See [TEST_PLAN.md](TEST_PLAN.md) for the acceptance criteria. No production LM Studio server was reachable from this test machine; the user reported chat and tools working there. The alternate gateway probes below used OmniRoute `auto/best-chat` (routing may select different underlying models), in a disposable checkout with no existing user data. No credentials were saved to that checkout.
+Original audit source: `main` at `cdbb86a` plus the send-button/divider removal. The failures below describe that original audit; see the post-fix retest at the end. This is **not** a 1.0 certification. See [TEST_PLAN.md](TEST_PLAN.md) for the acceptance criteria. No production LM Studio server was reachable from this test machine; the user reported chat and tools working there. The alternate gateway probes below used OmniRoute `auto/best-chat` (routing may select different underlying models), in a disposable checkout with no existing user data. No credentials were saved to that checkout.
 
 ## Verified locally
 
@@ -31,4 +31,8 @@ The disposable loop probe suite had **2 passing, 4 failing, and 1 erroring** cas
 - Concurrent symlink/path-swap races and a full UI smoke test on the user's terminal were not performed.
 - One OmniRoute response after a successful `pwd` tool result gave unrelated prose; treat this as model/router variability, not proof of a harness bug. The TUI currently shows the tool name, not the returned result, which makes such misreporting harder for a user to spot.
 
-Do not tag or publish 1.0 until the high-severity failures are fixed and the [release gate](TEST_PLAN.md#d-release-decision) is actually met.
+## Post-fix retest
+
+The subsequent bug-fix change addressed all seven confirmed failures above. The full suite now passes **103 tests** without provider configuration, including from a fresh source snapshot. All seven disposable loop probes pass. Fault-injected atomic replacement leaves the original file intact and cleans up the temporary sibling; literal `True` is now required for shell/file deletion approval. A supplemental OmniRoute tool call after the fixes created the expected file in a disposable checkout. A 100,000-character `read_file` result and multiple large results now reach the model as bounded, explicitly marked truncated tool messages with matching call IDs instead of stranding the turn. A regression test also covers short tool text whose JSON escaping makes it exceed the request budget.
+
+Remaining limits: request budgeting uses serialized **characters**, not an exact model tokenizer; concurrent filesystem path-swap races have not been ruled out; live LM Studio and the inconclusive cases above still require their own acceptance evidence. Do not tag or publish 1.0 until the full [release gate](TEST_PLAN.md#d-release-decision) is met.

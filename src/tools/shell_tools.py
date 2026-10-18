@@ -13,7 +13,11 @@ def execute_command(command: str, *, approve: Callable[[str], bool] | None = Non
     if sandbox is None:
         return "Error: bubblewrap is required to run shell commands safely."
     #give the user a chance to approve the command before executing it
-    if approve is None or not approve(f"Run sandboxed shell command: $ {command}"):
+    try:
+        approved = approve(f"Run sandboxed shell command: $ {command}") if approve is not None else False
+    except Exception:
+        approved = False
+    if approved is not True:
         return "Action canceled: User denied command execution."
     try:
         # 2. Give the process a temporary root and expose only the workspace

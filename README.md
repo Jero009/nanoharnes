@@ -20,7 +20,7 @@ uv run python src/main.py
 
 Edit `.env` first if LM Studio is not on `localhost:1234`. `API_KEY=lm-studio` is a placeholder accepted by a local LM Studio server; for a remote provider, use its actual key. Never commit `.env`. NanoHarness selects the first model returned by the server's `/v1/models` endpoint, so load the model you intend to use before starting.
 
-The default output cap is 4,096 tokens per model request. A token-limit response is reported as incomplete; partial tool calls are not executed. Conversation history retains the newest eight user turns. Longer-term facts are managed by the model through memory tools rather than by extending chat history.
+The default output cap is 4,096 tokens per model request. A token-limit response is reported as incomplete; partial tool calls are not executed. Conversation history retains the newest eight user turns, subject to a 100,000-character serialized request budget; tool results are truncated after 10,000 characters with a marker when sent to the model. This character budget is not an exact token count or a guarantee for every model context window. Longer-term facts are managed by the model through memory tools rather than by extending chat history.
 
 ## Data and approvals
 

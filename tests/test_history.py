@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -5,9 +6,40 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from context.history import trim_history
+from context.history import trim_history, budget_history
 
 class HistoryTests(unittest.TestCase):
+    def test_budget_keeps_complete_recent_tool_turn_and_current_question(self):
+        messages = [
+            {"role": "system", "content": "rules"},
+            {"role": "user", "content": "old"},
+            {"role": "assistant", "content": None, "tool_calls": [{"id": "old"}]},
+            {"role": "tool", "tool_call_id": "old", "content": "x" * 1000},
+            {"role": "user", "content": "recent"},
+            {"role": "assistant", "content": None, "tool_calls": [{"id": "new"}]},
+            {"role": "tool", "tool_call_id": "new", "content": "result"},
+            {"role": "user", "content": "current"},
+        ]
+        result = budget_history(messages, 500)
+        self.assertEqual(result, messages[:1] + messages[4:])
+        self.assertIsNone(budget_history(messages, 10))
+
+    def test_budget_shortens_small_result_with_expensive_json_escaping(self):
+        content = "\\" * 55
+        messages = [
+            {"role": "system", "content": "rules"},
+            {"role": "user", "content": "question"},
+            {"role": "assistant", "content": None, "tool_calls": [{"id": "call-1"}]},
+            {"role": "tool", "tool_call_id": "call-1", "content": content},
+        ]
+        limit = len(json.dumps(messages, ensure_ascii=False)) - 1
+        result = budget_history(messages, limit)
+        self.assertIsNotNone(result)
+        self.assertEqual(result[-1]["tool_call_id"], "call-1")
+        self.assertIn("TRUNCATED", result[-1]["content"])
+        self.assertLessEqual(len(json.dumps(result, ensure_ascii=False)), limit)
+        self.assertEqual(messages[-1]["content"], content)
+
     def test_keeps_system_and_newest_turns(self):
         messages = [
             {"role": "system", "content": "system rules"},

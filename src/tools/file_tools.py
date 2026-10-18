@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+import stat
+import tempfile
 from typing import Callable
 from config import ALLOWED_DIR, MAX_FILE_SIZE_BYTES
 
@@ -89,7 +92,17 @@ def edit_file(file_path: str, content: str, mode: str = "overwrite") -> str:
             with target_path.open("a", encoding="utf-8") as f:
                 f.write(content)
         else:
-            target_path.write_text(content, encoding="utf-8")
+            temporary_path = None
+            try:
+                with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=target_path.parent,
+                                                 prefix=f".{target_path.name}.", delete=False) as temporary:
+                    temporary_path = Path(temporary.name)
+                    temporary.write(content)
+                os.chmod(temporary_path, stat.S_IMODE(target_path.stat().st_mode))
+                os.replace(temporary_path, target_path)
+            finally:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
     except Exception as exc:
         return f"Error: {exc!r}"
 
@@ -113,7 +126,11 @@ def delete_file(file_path: str, *, approve: Callable[[str], bool] | None = None)
         return f"Error: File not found: {file_path}"
 
     # Never let a model invoke deletion without an explicit human approver.
-    if approve is None or not approve(f"Delete file: {path}"):
+    try:
+        approved = approve(f"Delete file: {path}") if approve is not None else False
+    except Exception:
+        approved = False
+    if approved is not True:
         return "Action canceled: User denied deletion request."
 
     path.unlink()

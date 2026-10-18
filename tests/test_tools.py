@@ -121,6 +121,42 @@ class ToolTests(unittest.TestCase):
             "first\nsecond\n",
         )
 
+    def test_overwrite_write_failure_preserves_original_and_cleans_temporary_file(self):
+        target = self.workspace / "notes.txt"
+        target.write_text("ORIGINAL", encoding="utf-8")
+        import tempfile
+        original_tempfile = tempfile.NamedTemporaryFile
+        class FailingTempFile:
+            def __init__(self, **kwargs):
+                self.file = original_tempfile(**kwargs)
+                self.name = self.file.name
+            def __enter__(self):
+                self.file.__enter__()
+                return self
+            def __exit__(self, *args):
+                return self.file.__exit__(*args)
+            def write(self, content):
+                self.file.write("PARTIAL")
+                raise OSError("injected write failure")
+        with patch.object(tempfile, "NamedTemporaryFile", FailingTempFile):
+            result = file_tools.edit_file("notes.txt", "REPLACEMENT")
+        self.assertIn("Error", result)
+        self.assertEqual(target.read_text(encoding="utf-8"), "ORIGINAL")
+        self.assertEqual(list(self.workspace.iterdir()), [target])
+
+    def test_overwrite_replaces_file_successfully(self):
+        target = self.workspace / "notes.txt"
+        target.write_text("ORIGINAL", encoding="utf-8")
+        self.assertEqual(file_tools.edit_file("notes.txt", "NEW"), "File updated (overwrite mode).")
+        self.assertEqual(target.read_text(encoding="utf-8"), "NEW")
+
+    def test_overwrite_preserves_existing_file_permissions(self):
+        target = self.workspace / "notes.txt"
+        target.write_text("ORIGINAL", encoding="utf-8")
+        target.chmod(0o644)
+        file_tools.edit_file("notes.txt", "NEW")
+        self.assertEqual(target.stat().st_mode & 0o777, 0o644)
+
     def test_edit_file_rejects_invalid_mode(self):
         file_tools.create_file("notes.txt", "hello")
 
@@ -153,6 +189,20 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(result, "Action canceled: User denied deletion request.")
         self.assertTrue((self.workspace / "keep.txt").exists())
         confirm.assert_called_once()
+
+    def test_delete_file_approval_error_denies_without_deleting(self):
+        target = self.workspace / "keep.txt"
+        target.write_text("important", encoding="utf-8")
+        result = file_tools.delete_file("keep.txt", approve=Mock(side_effect=RuntimeError("UI closed")))
+        self.assertIn("denied", result.lower())
+        self.assertTrue(target.exists())
+
+    def test_delete_file_non_boolean_approval_denies(self):
+        target = self.workspace / "keep.txt"
+        target.write_text("important", encoding="utf-8")
+        result = file_tools.delete_file("keep.txt", approve=lambda _: "yes")
+        self.assertIn("denied", result.lower())
+        self.assertTrue(target.exists())
 
     def test_delete_file_removes_file_when_user_approves(self):
         file_tools.create_file("remove.txt", "temporary")
@@ -322,6 +372,19 @@ class ToolTests(unittest.TestCase):
         )
         self.assertIn("denied", result.lower())
         confirm.assert_called_once()
+
+    def test_shell_approval_error_denies_without_running(self):
+        with patch.object(shell_tools.shutil, "which", return_value="/bin/bwrap"):
+            result = shell_tools.execute_command(
+                "touch should-not-exist.txt", approve=Mock(side_effect=RuntimeError("UI closed"))
+            )
+        self.assertIn("denied", result.lower())
+        self.assertFalse((self.workspace / "should-not-exist.txt").exists())
+
+    def test_shell_non_boolean_approval_denies(self):
+        result = shell_tools.execute_command("touch should-not-exist.txt", approve=lambda _: "yes")
+        self.assertIn("denied", result.lower())
+        self.assertFalse((self.workspace / "should-not-exist.txt").exists())
 
     def test_shell_cannot_delete_without_approval(self):
         target = self.workspace / "protected.txt"

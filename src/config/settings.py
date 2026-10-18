@@ -5,6 +5,7 @@ MAX_FILE_SIZE_BYTES = 100_000
 MAX_OUTPUT_CHARS = 10_000
 MAX_TOOL_ROUNDS = 5
 MAX_HISTORY_TURNS = 8
+MAX_CONTEXT_CHARS = 100_000  # serialized request messages; leave room for generation
 MAX_TOKENS = 4096
 
 ALLOWED_DIR.mkdir(parents=True, exist_ok=True)
