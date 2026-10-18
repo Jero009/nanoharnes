@@ -3,7 +3,7 @@ import json
 from typing import Callable
 
 from config.connection import client, get_model_name
-from config import MAX_TOOL_ROUNDS, SYSTEM_PROMPT, MAX_HISTORY_TURNS
+from config import MAX_TOOL_ROUNDS, SYSTEM_PROMPT, MAX_HISTORY_TURNS,MAX_TOKENS
 from context.history import trim_history
 from tools import TOOLS, TOOL_FUNCTIONS
 
@@ -38,6 +38,7 @@ def run_turn(
             temperature=0.6,
             presence_penalty=0.3,
             frequency_penalty=0.3,
+            max_completion_tokens=MAX_TOKENS
         )
 
         full_response = ""
