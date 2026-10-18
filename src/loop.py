@@ -3,7 +3,7 @@ import json
 from typing import Callable
 
 from config.connection import client, get_model_name
-from config import MAX_TOOL_ROUNDS, SYSTEM_PROMPT, MAX_HISTORY_TURNS,MAX_TOKENS
+from config import MAX_TOOL_ROUNDS, SYSTEM_PROMPT, MAX_HISTORY_TURNS, MAX_TOKENS
 from context.history import trim_history
 from tools import TOOLS, TOOL_FUNCTIONS
 
@@ -38,14 +38,19 @@ def run_turn(
             temperature=0.6,
             presence_penalty=0.3,
             frequency_penalty=0.3,
-            max_completion_tokens=MAX_TOKENS
+            max_tokens=MAX_TOKENS,
         )
 
         full_response = ""
         tool_calls_data = {}
+        finish_reason = None
         # Read every streamed chunk before executing a tool.
         for chunk in response_stream:
-            delta = chunk.choices[0].delta
+            choice = chunk.choices[0]
+            delta = choice.delta
+            reason = getattr(choice, "finish_reason", None)
+            if reason is not None:
+                finish_reason = reason
             content = getattr(delta, "content", None)
             tool_calls = getattr(delta, "tool_calls", None)
             reasoning = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
@@ -68,6 +73,16 @@ def run_turn(
                     if tc.function.name:
                         saved_call["name"] = tc.function.name
                     saved_call["arguments"] += tc.function.arguments or ""
+
+        if finish_reason == "length":
+            emit("status", "Response truncated at the token limit. No tool was run; conversation preserved.")
+            return
+        if finish_reason not in ("stop", "tool_calls"):
+            emit("status", f"Response ended unexpectedly ({finish_reason}); no tool was run.")
+            return
+        if not tool_calls_data and not full_response.strip():
+            emit("status", "Model returned no answer; conversation preserved.")
+            return
 
         # Save the completed assistant response, including its tool request.
         assistant_message = {"role": "assistant", "content": full_response or None}

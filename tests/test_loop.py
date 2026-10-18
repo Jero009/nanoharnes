@@ -11,14 +11,15 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import loop as agent_loop
 
-def text_chunk(content: str):
+def text_chunk(content: str, finish_reason: str | None = "stop"):
     return SimpleNamespace(
         choices=[
             SimpleNamespace(
                 delta=SimpleNamespace(
                     content=content,
                     tool_calls=None,
-                )
+                ),
+                finish_reason=finish_reason,
             )
         ]
     )
@@ -29,6 +30,7 @@ def tool_chunk(
     call_id: str | None,
     name: str | None,
     arguments: str,
+    finish_reason: str | None = "tool_calls",
 ):
     return SimpleNamespace(
         choices=[
@@ -45,7 +47,8 @@ def tool_chunk(
                             ),
                         )
                     ],
-                )
+                ),
+                finish_reason=finish_reason,
             )
         ]
     )
@@ -142,6 +145,7 @@ class LoopTests(unittest.TestCase):
                         call_id="call_1",
                         name="echo",
                         arguments='{"text":"hel',
+                        finish_reason=None,
                     ),
                     tool_chunk(
                         index=0,
@@ -408,6 +412,73 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(tool_result_message["role"], "tool")
         self.assertEqual(tool_result_message["tool_call_id"], "original_id")
         self.assertEqual(tool_result_message["content"], "healthy")
+
+    def test_reasoning_limit_keeps_prior_conversation_and_marks_turn_incomplete(self):
+        messages = agent_loop.new_messages() + [
+            {"role": "user", "content": "My name is Jernej"},
+            {"role": "assistant", "content": "Got it"},
+        ]
+        events = []
+        reasoning_chunk = SimpleNamespace(choices=[SimpleNamespace(
+            delta=SimpleNamespace(content=None, tool_calls=None, reasoning="thinking"),
+            finish_reason="length",
+        )])
+        with patch.object(agent_loop.client.chat.completions, "create",
+                          return_value=[reasoning_chunk]) as create:
+            agent_loop.run_turn(messages, "What is my name?", model_name="test-model",
+                                emit=lambda kind, value: events.append((kind, value)))
+        self.assertEqual(create.call_count, 1)
+        self.assertEqual(create.call_args.kwargs["max_tokens"], agent_loop.MAX_TOKENS)
+        self.assertEqual(messages[-3:], [
+            {"role": "user", "content": "My name is Jernej"},
+            {"role": "assistant", "content": "Got it"},
+            {"role": "user", "content": "What is my name?"},
+        ])
+        self.assertTrue(any(kind == "status" and "truncat" in text.lower()
+                            for kind, text in events))
+
+        # A later turn must still receive the earlier conversation and the failed question.
+        sent = []
+        def respond(**kwargs):
+            sent.extend(copy.deepcopy(kwargs["messages"]))
+            return [text_chunk("Your name is Jernej")]
+        with patch.object(agent_loop.client.chat.completions, "create", side_effect=respond):
+            agent_loop.run_turn(messages, "Try again", model_name="test-model")
+        self.assertEqual(sent[-4:], [
+            {"role": "user", "content": "My name is Jernej"},
+            {"role": "assistant", "content": "Got it"},
+            {"role": "user", "content": "What is my name?"},
+            {"role": "user", "content": "Try again"},
+        ])
+
+    def test_truncated_tool_call_is_never_executed(self):
+        tool = Mock(return_value="ran")
+        messages = agent_loop.new_messages()
+        events = []
+        with patch.object(agent_loop.client.chat.completions, "create", return_value=[
+            tool_chunk(index=0, call_id="call_1", name="dangerous",
+                       arguments="{}", finish_reason="length"),
+        ]), patch.object(agent_loop, "TOOL_FUNCTIONS", {"dangerous": tool}):
+            agent_loop.run_turn(messages, "question", model_name="test-model",
+                                emit=lambda kind, value: events.append((kind, value)))
+        tool.assert_not_called()
+        self.assertEqual(messages[-1], {"role": "user", "content": "question"})
+        self.assertTrue(any(kind == "status" and "truncat" in text.lower()
+                            for kind, text in events))
+
+    def test_empty_reasoning_response_is_not_a_successful_answer(self):
+        messages = agent_loop.new_messages()
+        events = []
+        chunk = SimpleNamespace(choices=[SimpleNamespace(
+            delta=SimpleNamespace(content=None, tool_calls=None, reasoning="thinking"),
+            finish_reason="stop",
+        )])
+        with patch.object(agent_loop.client.chat.completions, "create", return_value=[chunk]):
+            agent_loop.run_turn(messages, "question", model_name="test-model",
+                                emit=lambda kind, value: events.append((kind, value)))
+        self.assertEqual(messages[-1], {"role": "user", "content": "question"})
+        self.assertTrue(any(kind == "status" and "no answer" in text.lower()
+                            for kind, text in events))
 
 if __name__ == "__main__":
     unittest.main()

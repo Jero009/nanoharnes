@@ -104,12 +104,13 @@ class MemoryTests(unittest.TestCase):
             store.create_memory("large", "x" * 500_000, approve=lambda _: True)
         self.assertEqual(self.path.read_bytes(), original)
 
-    def model(self, keep):
+    def model(self, keep, finish_reason="stop"):
         calls = []
         def create(**kwargs):
             calls.append(kwargs)
             return SimpleNamespace(choices=[SimpleNamespace(
-                message=SimpleNamespace(content=json.dumps({"keep": keep})))])
+                message=SimpleNamespace(content=json.dumps({"keep": keep})),
+                finish_reason=finish_reason)])
         fake = SimpleNamespace(
             client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))),
             get_model_name=lambda: "same-model",
@@ -129,6 +130,8 @@ class MemoryTests(unittest.TestCase):
                     return True
                 self.assertTrue(store.compact_memory_if_needed(approve=approve))
             self.assertEqual(calls[0]["model"], "same-model")
+            from config import MAX_TOKENS
+            self.assertEqual(calls[0]["max_tokens"], MAX_TOKENS)
             self.assertIn("old", approvals[0])
             self.assertEqual(store.list_memory(), {"important": "A" * 35})
             backups = list(self.path.parent.glob("memories-backup-*.json"))
@@ -149,6 +152,16 @@ class MemoryTests(unittest.TestCase):
                 with fake, self.assertRaises(ValueError):
                     store.compact_memory_if_needed(approve=approve)
                 self.assertEqual(self.path.read_bytes(), original)
+            self.assertEqual(list(self.path.parent.glob("memories-backup-*.json")), [])
+
+    def test_truncated_compaction_cannot_delete_facts(self):
+        with patch.object(store, "MAX_MEMORY_BYTES", 80):
+            self.seed(json.dumps({"important": "A" * 35, "old": "B" * 35}))
+            original = self.path.read_bytes()
+            fake, _ = self.model(["important"], finish_reason="length")
+            with fake, self.assertRaisesRegex(ValueError, "truncated"):
+                store.compact_memory_if_needed(approve=lambda _: True)
+            self.assertEqual(self.path.read_bytes(), original)
             self.assertEqual(list(self.path.parent.glob("memories-backup-*.json")), [])
 
     def test_missing_approval_does_not_contact_model(self):

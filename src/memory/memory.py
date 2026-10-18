@@ -58,6 +58,7 @@ def _model_compaction(data: dict[str, str], approve: Callable[[str], bool] | Non
     if approve is None:
         raise ValueError("Memory compaction requires an approval provider.")
     from config.connection import client, get_model_name
+    from config import MAX_TOKENS
 
     response = client.chat.completions.create(
         model=model_name or get_model_name(),
@@ -73,7 +74,10 @@ def _model_compaction(data: dict[str, str], approve: Callable[[str], bool] | Non
         ],
         stream=False,
         temperature=0,
+        max_tokens=MAX_TOKENS,
     )
+    if response.choices[0].finish_reason != "stop":
+        raise ValueError("Model compaction response truncated or incomplete; memory unchanged.")
     try:
         reply = response.choices[0].message.content
         if not isinstance(reply, str):
