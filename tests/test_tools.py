@@ -99,6 +99,32 @@ class ToolTests(unittest.TestCase):
 
         self.assertIn("File is too large", result)
 
+    def test_read_file_bounds_bytes_if_file_grows_after_stat(self):
+        (self.workspace / "growing.txt").write_bytes(b"12345")
+        real_fstat = file_tools.os.fstat
+        def old_size(fd):
+            info = real_fstat(fd)
+            return Mock(st_mode=info.st_mode, st_size=0)
+        with patch.object(file_tools, "MAX_FILE_SIZE_BYTES", 4), patch.object(
+            file_tools.os, "fstat", side_effect=old_size,
+        ):
+            result = file_tools.read_file("growing.txt")
+        self.assertIn("too large", result.lower())
+
+    def test_read_file_closes_descriptor_if_stat_fails(self):
+        import os
+        (self.workspace / "note.txt").write_text("safe", encoding="utf-8")
+        descriptors = []
+        def fail_stat(descriptor):
+            descriptors.append(descriptor)
+            raise OSError("injected stat failure")
+        with patch.object(file_tools.os, "fstat", side_effect=fail_stat):
+            result = file_tools.read_file("note.txt")
+        self.assertIn("Error", result)
+        self.assertEqual(len(descriptors), 1)
+        with self.assertRaises(OSError):
+            os.fstat(descriptors[0])
+
     def test_read_file_rejects_non_utf8_file(self):
         (self.workspace / "binary.bin").write_bytes(b"\xff\xfe")
 
@@ -148,6 +174,16 @@ class ToolTests(unittest.TestCase):
         target = self.workspace / "notes.txt"
         target.write_text("ORIGINAL", encoding="utf-8")
         self.assertEqual(file_tools.edit_file("notes.txt", "NEW"), "File updated (overwrite mode).")
+        self.assertEqual(target.read_text(encoding="utf-8"), "NEW")
+
+    def test_overwrite_write_only_file_does_not_require_read_permission(self):
+        target = self.workspace / "write-only.txt"
+        target.write_text("OLD", encoding="utf-8")
+        target.chmod(0o200)
+        self.assertEqual(file_tools.edit_file("write-only.txt", "NEW"),
+                         "File updated (overwrite mode).")
+        self.assertEqual(target.stat().st_mode & 0o777, 0o200)
+        target.chmod(0o600)
         self.assertEqual(target.read_text(encoding="utf-8"), "NEW")
 
     def test_overwrite_preserves_existing_file_permissions(self):
@@ -213,6 +249,59 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(result, "File deleted: remove.txt")
         self.assertFalse((self.workspace / "remove.txt").exists())
         confirm.assert_called_once()
+
+    def test_delete_does_not_follow_changed_parent_after_approval(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            allowed = base / "allowed"
+            nested = allowed / "nested"
+            outside = base / "outside"
+            nested.mkdir(parents=True)
+            outside.mkdir()
+            (nested / "note.txt").write_text("inside", encoding="utf-8")
+            protected = outside / "note.txt"
+            protected.write_text("outside", encoding="utf-8")
+
+            def approve(_):
+                nested.rename(allowed / "moved")
+                nested.symlink_to(outside, target_is_directory=True)
+                return True
+
+            with patch.object(file_tools, "ALLOWED_DIR", allowed):
+                file_tools.delete_file("nested/note.txt", approve=approve)
+            self.assertEqual(protected.read_text(encoding="utf-8"), "outside")
+
+    def test_file_and_directory_tools_reject_symlinks_to_outside(self):
+        with tempfile.TemporaryDirectory() as root:
+            outside = Path(root) / "outside"
+            outside.mkdir()
+            secret = outside / "secret.txt"
+            secret.write_text("private", encoding="utf-8")
+            (self.workspace / "external").symlink_to(outside, target_is_directory=True)
+            (self.workspace / "file-link").symlink_to(secret)
+            source = self.workspace / "source.txt"
+            source.write_text("inside", encoding="utf-8")
+            operations = [
+                lambda: file_tools.read_file("external/secret.txt"),
+                lambda: file_tools.read_file("file-link"),
+                lambda: file_tools.create_file("external/new.txt", "no"),
+                lambda: file_tools.edit_file("external/secret.txt", "no"),
+                lambda: file_tools.edit_file("file-link", "no", mode="append"),
+                lambda: file_tools.rename_file("source.txt", "external/new.txt"),
+                lambda: file_tools.get_file_length("external/secret.txt"),
+                lambda: file_tools.read_lines("external/secret.txt"),
+                lambda: dir_tools.ls("external"),
+                lambda: dir_tools.mkdir("external/new"),
+            ]
+            for operation in operations:
+                with self.subTest(operation=operation):
+                    result = operation()
+                    self.assertIn("Error", result)
+                    self.assertNotIn("private", result)
+            self.assertEqual(secret.read_text(encoding="utf-8"), "private")
+            self.assertEqual(source.read_text(encoding="utf-8"), "inside")
+            self.assertFalse((outside / "new.txt").exists())
+            self.assertFalse((outside / "new").exists())
 
     def test_rename_file_moves_file(self):
         file_tools.create_file("old.txt", "hello")

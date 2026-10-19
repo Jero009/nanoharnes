@@ -55,6 +55,71 @@ def tool_chunk(
     )
 
 class LoopTests(unittest.TestCase):
+    def test_summary_is_in_live_request_without_internal_marker(self):
+        messages = agent_loop.new_messages()
+        for index in range(8):
+            messages.extend([{"role": "user", "content": f"earlier-{index}"},
+                             {"role": "assistant", "content": f"reply-{index}"}])
+        summary = SimpleNamespace(choices=[SimpleNamespace(
+            finish_reason="stop", message=SimpleNamespace(content="Earlier topic: telescope"))])
+        requests = []
+        def respond(**kwargs):
+            requests.append(copy.deepcopy(kwargs))
+            return summary if not kwargs.get("stream") else [text_chunk("done")]
+        with patch.object(agent_loop.client.chat.completions, "create", side_effect=respond):
+            agent_loop.run_turn(messages, "new question", model_name="test-model")
+        self.assertEqual(len(requests), 2)
+        self.assertFalse(requests[0]["stream"])
+        self.assertEqual(requests[0]["max_tokens"], 300)
+        self.assertTrue(requests[1]["stream"])
+        sent = requests[1]["messages"]
+        self.assertIn("Earlier topic: telescope", sent[1]["content"])
+        self.assertEqual(sent[1]["role"], "assistant")
+        self.assertTrue(all("is_summary" not in item for item in sent))
+        self.assertEqual(sent[-1]["content"], "new question")
+        self.assertEqual(messages[-1]["content"], "done")
+
+    def test_summary_includes_every_turn_that_retention_would_drop(self):
+        messages = agent_loop.new_messages()
+        for index in range(12):
+            messages.extend([{"role": "user", "content": f"earlier-{index}"},
+                             {"role": "assistant", "content": f"reply-{index}"}])
+        summary = SimpleNamespace(choices=[SimpleNamespace(
+            finish_reason="stop", message=SimpleNamespace(content="All earlier facts"))])
+        requests = []
+        def respond(**kwargs):
+            requests.append(copy.deepcopy(kwargs))
+            return summary if not kwargs.get("stream") else [text_chunk("done")]
+        with patch.object(agent_loop.client.chat.completions, "create", side_effect=respond):
+            agent_loop.run_turn(messages, "current", model_name="test-model")
+        source = requests[0]["messages"][1]["content"]
+        self.assertIn("earlier-4", source)
+        self.assertNotIn("earlier-5", source)
+        sent = requests[1]["messages"]
+        self.assertIn("All earlier facts", sent[1]["content"])
+        self.assertEqual(sent[2]["content"], "earlier-5")
+        self.assertEqual(sent[-1]["content"], "current")
+
+    def test_failed_summary_does_not_stop_followup_request(self):
+        messages = agent_loop.new_messages()
+        for index in range(8):
+            messages.extend([{"role": "user", "content": f"earlier-{index}"},
+                             {"role": "assistant", "content": f"reply-{index}"}])
+        events = []
+        requests = []
+        def respond(**kwargs):
+            requests.append(copy.deepcopy(kwargs))
+            if not kwargs.get("stream"):
+                raise OSError("summarizer unavailable")
+            return [text_chunk("recovered")]
+        with patch.object(agent_loop.client.chat.completions, "create", side_effect=respond):
+            agent_loop.run_turn(messages, "current", model_name="test-model",
+                                emit=lambda kind, text: events.append((kind, text)))
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(requests[1]["messages"][-1]["content"], "current")
+        self.assertTrue(any(kind == "status" and "Summary failed" in text for kind, text in events))
+        self.assertEqual(messages[-1]["content"], "recovered")
+
     def test_missing_or_invalid_tool_metadata_rejects_entire_batch(self):
         for malformed in (
             tool_chunk(index=1, call_id=None, name="dangerous", arguments="{}"),

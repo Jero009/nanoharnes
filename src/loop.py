@@ -5,7 +5,7 @@ from typing import Callable
 from config.connection import client, get_model_name
 from config import MAX_TOOL_ROUNDS, SYSTEM_PROMPT, MAX_HISTORY_TURNS, MAX_TOKENS, MAX_OUTPUT_CHARS
 from config.settings import MAX_CONTEXT_CHARS
-from context.history import trim_history, budget_history
+from context.history import trim_history, budget_history, trim_with_summary
 from tools import TOOLS, TOOL_FUNCTIONS
 
 
@@ -23,13 +23,21 @@ def run_turn(
 ) -> None:
     """Run one user turn; emit streamed text without owning a terminal UI."""
     messages.append({"role": "user", "content": user_input})
-    messages[:] = trim_history(messages, MAX_HISTORY_TURNS)  # keep newest complete turns
     if model_name is None:
         try:
             model_name = get_model_name()
         except Exception as error:
+            messages[:] = trim_history(messages, MAX_HISTORY_TURNS)
             emit("status", f"Model discovery failed: {error}. Question preserved; retry when available.")
             return
+    try:
+        summarized = trim_with_summary(client, model_name, messages)
+        if summarized is not messages:
+            messages[:] = summarized
+            emit("status", "Older conversation summarized.")
+    except Exception as error:
+        emit("status", f"Summary failed ({type(error).__name__}); using recent turns.")
+    messages[:] = trim_history(messages, MAX_HISTORY_TURNS)
 
     tool_rounds = 0
     # Keeps responding while the model requests tools.
