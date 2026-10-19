@@ -1,6 +1,6 @@
 # NanoHarness
 
-A local terminal coding agent for an OpenAI-compatible chat-completions server. This v0.1 release is run from a source checkout on Linux; it is not an installable package.
+A local terminal coding agent for an OpenAI-compatible chat-completions server. Run it from a source checkout on Linux; `install.sh` installs checkout-local dependencies, not a system-wide package.
 
 ## Requirements
 
@@ -13,10 +13,13 @@ A local terminal coding agent for an OpenAI-compatible chat-completions server. 
 Start LM Studio's local server, load a tool-capable model, then from a fresh checkout:
 
 ```bash
-uv sync --frozen
-cp .env.example .env
+git clone https://github.com/Jero009/nanoharnes.git
+cd nanoharnes
+./install.sh
 uv run python src/main.py
 ```
+
+`install.sh` checks Linux, `uv`, and `bwrap`, runs `uv sync --frozen` in this checkout, and copies `.env.example` to `.env` only when `.env` does not already exist. It never removes workspace files or replaces existing configuration. You can also install manually with `uv sync --frozen` and `cp .env.example .env`.
 
 Edit `.env` first if LM Studio is not on `localhost:1234`. `API_KEY=lm-studio` is a placeholder accepted by a local LM Studio server; for a remote provider, use its actual key. Never commit `.env`. NanoHarness selects the first model returned by the server's `/v1/models` endpoint, so load the model you intend to use before starting.
 
