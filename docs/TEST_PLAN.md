@@ -1,6 +1,6 @@
 # NanoHarness 1.0 test plan
 
-This is a **finite release gate**, not a request to add more features. Target: source-run Linux NanoHarness with a tool-capable LM Studio model. Cross-provider API compatibility is out of scope. Perform destructive tests only in a disposable checkout, never against your everyday `workspace/` or `.nanoharness/` data.
+This is a **finite release gate**, not a request to add more features. Target: source-run Linux NanoHarness with a tool-capable OpenAI-compatible model; LM Studio is the intended local setup. Cross-provider API compatibility is out of scope. Perform destructive tests only in a disposable checkout, never against your everyday `workspace/` or `.nanoharness/` data.
 
 A test passes only when its **observed result** matches the expected result. A model's claim that it used a tool does not prove the tool ran: inspect tool events/results and the target file or memory store. Record model name, server version, git commit, OS, command/prompt, observed result, and pass/fail for live runs. Do not record API keys or private memory contents.
 
@@ -37,7 +37,9 @@ Write these as isolated tests in the existing `tests/` modules. For each, make t
 
 Only add a test if the risk is real in the current execution path; if an existing test already proves an item, link to it rather than duplicate it. Fix failing P0 tests before proceeding to the live gate.
 
-## C. Live LM Studio acceptance — disposable checkout
+## C. Live LM Studio acceptance — optional follow-up in a disposable checkout
+
+Jernej waived a separate LM Studio run for the 1.0 release decision. This checklist remains for later verification of the intended local setup; none of its unperformed items is marked passed. The prior OmniRoute run is supplemental live evidence, not LM Studio certification.
 
 Make a separate checkout and configure its own `.env` for the running server. Confirm the model name shown/used is the intended loaded model. Use unique throwaway filenames and memory keys (for example `release_probe.txt` and `release_probe_fact`); do **not** point these tests at your normal checkout. Run this table in order, capturing the visible tool result and checking the filesystem or `.nanoharness/memories.json` after each write. Delete only test data in the disposable checkout.
 
@@ -61,9 +63,9 @@ An approved alternate OpenAI-compatible gateway (such as OmniRoute) can provide 
 ## D. Release decision
 
 - All existing automated tests and the additional **applicable** P0 regressions pass in a clean checkout.
-- E1–E10 pass with actual LM Studio tool events and on-disk state; if a scenario cannot be induced, record it as **not verified**, not passed.
+- The core live workflow has supplemental OmniRoute evidence recorded in [TEST_RESULTS.md](TEST_RESULTS.md); live file deletion, a server disconnect, and the newest running-summary change are **not verified**. Jernej waived a separate LM Studio test and requested a 1.0 release with these gaps recorded. Do not claim E1–E10 or the current revision passed live on LM Studio.
 - No known critical/high data-loss, sandbox-escape, approval-bypass, or stuck-session bug remains.
 - Setup from the documented fresh checkout succeeds. Inspect the final diff and source-release contents for secrets and generated user data.
-- Only then tag and publish `v1.0.0`; read the remote release back to verify its tag and published state.
+- Only then tag the corrected source `v1.0.0` and publish a GitHub release titled **1.0**; read the remote release back to verify its tag and published state. Preserve the earlier pushed `v1.0` tag (it points to an older commit with package version `0.1.0`); do not silently move that public tag.
 
 After this gate, stop feature work for 1.0 and switch to maintenance. Skills, broad provider certification, and speculative extension systems are not part of this test plan.
