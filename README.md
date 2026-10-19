@@ -38,4 +38,10 @@ The default output cap is 4,096 tokens per model request. A token-limit response
 uv run python -m unittest discover -s tests -v
 ```
 
-The shell tests execute real bubblewrap commands on Linux. See [the 1.0 test plan](docs/TEST_PLAN.md) and [latest audit results](docs/TEST_RESULTS.md) for the remaining regression cases and disposable-checkout acceptance checks. Check actual tool results and stored data rather than assuming a successful tool call.
+The shell tests execute real bubblewrap commands on Linux. For the published 1.0 release's verification scope and remaining live-test gaps, see its [release notes](https://github.com/Jero009/nanoharnes/releases/tag/v1.0.0). The release tag retains the original audit documents. Check actual tool results and stored data rather than assuming a successful tool call.
+
+## Memory and context
+
+These are cooperating mechanisms, **not selectable modes**. The model may save and retrieve persistent facts with memory tools; `.nanoharness/memories.json` survives `/new` and restarts. Creation and updates are automatic; deletion and size-triggered compaction require approval. Conversation summaries are session-only: after chat exceeds 15 messages, NanoHarness asks the model to summarize complete older turns before keeping the newest eight user turns. If summarization fails, it reports the failure and uses the eight-turn trim. A 100,000-character serialized request budget may omit older turns or shorten tool results even earlier. `/new` resets the conversation but not persistent memory; `/clear` only hides the visible chat.
+
+There is no TUI switch among memory, summarization, and trimming. `src/config/settings.py` contains the eight-turn and request-size limits; `src/context/history.py` contains the 15-message summary trigger. Changing these requires editing source and restarting; it does not change what has already been summarized or forgotten.
