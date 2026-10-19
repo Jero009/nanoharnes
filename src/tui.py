@@ -7,6 +7,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Input, Static
 
 from loop import new_messages, run_turn
+HINT = "Enter send · Ctrl+L new chat · /help commands"
 BANNER = r"""[bold]
   _  _   _   _  _  ___    _   ___ ___ _  _ _____
  | \| | /_\ | \| |/ _ \  /_\ / __| __| \| |_   _|
@@ -119,6 +120,7 @@ class NanoHarness(App):
         super().__init__()
         self.messages = new_messages()
         self.busy = False
+        self.yolo = False
         self.reply = None
         self.thinking = None
 
@@ -135,7 +137,7 @@ class NanoHarness(App):
         with Vertical(id="bottom"):
             with Horizontal(id="composer"):
                 yield Input(placeholder="Message NanoHarness…", id="prompt")
-            yield Static("Enter send · Ctrl+L new chat · /help commands", id="hint")
+            yield Static(HINT, id="hint")
     async def send_message(self) -> None:
         if self.busy:
             return
@@ -149,11 +151,16 @@ class NanoHarness(App):
                 self.exit()
             elif text == "/new":
                 self.messages = new_messages()
+                self.set_yolo(False)
                 await self.clear_chat()
             elif text == "/clear":
                 await self.clear_chat()
+            elif text in ("/yolo", "/yolo on", "/yolo off"):
+                self.set_yolo(not self.yolo if text == "/yolo" else text == "/yolo on")
+                self.show_event("status", "YOLO ON: approval prompts bypassed for this chat." if self.yolo
+                                else "YOLO OFF: approval prompts restored.")
             elif text == "/help":
-                self.show_event("help", "/clear — hide chat · /new — reset conversation · /help — commands · /bye — exit")
+                self.show_event("help", "/clear — hide chat · /new — reset conversation and YOLO · /yolo [on|off] — toggle approvals · /bye — exit")
             else:
                 self.show_event("error", f"Unknown command: {text}. Type /help.")
             return
@@ -166,6 +173,10 @@ class NanoHarness(App):
         self.reply = None
         self.thinking = None
         self.run_agent(text)
+
+    def set_yolo(self, enabled: bool) -> None:
+        self.yolo = enabled
+        self.query_one("#hint", Static).update(HINT + (" · YOLO ON (approvals bypassed)" if enabled else ""))
 
     def show_event(self, kind: str, text: str) -> None:
         chat = self.query_one("#chat", VerticalScroll)
@@ -186,6 +197,8 @@ class NanoHarness(App):
         chat.scroll_end()
 
     def request_approval(self, description: str) -> bool:
+        if self.yolo:
+            return True
         decision = Event()
         approved = False
 
@@ -226,6 +239,7 @@ class NanoHarness(App):
         if self.busy:
             return
         self.messages = new_messages()
+        self.set_yolo(False)
         await self.clear_chat()
 
     async def clear_chat(self) -> None:

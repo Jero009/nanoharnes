@@ -100,6 +100,66 @@ class TuiTests(unittest.TestCase):
 
         asyncio.run(check())
 
+    def test_yolo_skips_approval_prompts_until_disabled_or_new_chat(self):
+        approvals = []
+
+        def fake_turn(messages, text, *, approve, emit, **kwargs):
+            approvals.append(approve("Delete file: /workspace/safe.txt"))
+            emit("status", "approved" if approvals[-1] else "denied")
+
+        async def check():
+            with patch("tui.run_turn", side_effect=fake_turn):
+                app = NanoHarness()
+                async with app.run_test() as pilot:
+                    prompt = app.query_one("#prompt", Input)
+
+                    async def submit(text):
+                        prompt.focus()
+                        await pilot.press(*text, "enter")
+                        await pilot.pause()
+
+                    await submit("/yolo")
+                    self.assertTrue(app.yolo)
+                    self.assertIn("YOLO ON", str(app.query_one("#hint").render()))
+                    await submit("delete something")
+                    await app.workers.wait_for_complete()
+                    self.assertEqual(approvals, [True])
+                    self.assertEqual(len(app.query("ApprovalDialog")), 0)
+
+                    await submit("/yolo off")
+                    self.assertFalse(app.yolo)
+                    await submit("delete something else")
+                    for _ in range(30):
+                        await pilot.pause()
+                        if app.query("ApprovalDialog"):
+                            break
+                    self.assertEqual(len(app.query("ApprovalDialog")), 1)
+                    await pilot.click("#deny")
+                    await app.workers.wait_for_complete()
+                    self.assertEqual(approvals, [True, False])
+
+                    await submit("/yolo on")
+                    await submit("/new")
+                    self.assertFalse(app.yolo)
+                    self.assertNotIn("YOLO ON", str(app.query_one("#hint").render()))
+                    await submit("delete after reset")
+                    for _ in range(30):
+                        await pilot.pause()
+                        if app.query("ApprovalDialog"):
+                            break
+                    self.assertEqual(len(app.query("ApprovalDialog")), 1)
+                    await pilot.click("#deny")
+                    await app.workers.wait_for_complete()
+                    self.assertEqual(approvals, [True, False, False])
+                    await submit("/yolo on")
+                    await submit("/clear")
+                    self.assertTrue(app.yolo)
+                    await pilot.press("ctrl+l")
+                    self.assertFalse(app.yolo)
+                    self.assertNotIn("YOLO ON", str(app.query_one("#hint").render()))
+
+        asyncio.run(check())
+
     def test_dialog_keeps_chat_visible_and_keyboard_works(self):
         async def check():
             app = NanoHarness()

@@ -1,4 +1,5 @@
 import copy
+import json
 import sys
 import tempfile
 import unittest
@@ -206,6 +207,7 @@ class LoopTests(unittest.TestCase):
 
     def test_oversized_current_tool_round_truncates_result_and_continues(self):
         messages = agent_loop.new_messages()
+        budget = len(json.dumps(messages, ensure_ascii=False)) + 500
         requests = []
         streams = iter([
             [tool_chunk(index=0, call_id="id", name="echo", arguments="{}")],
@@ -214,14 +216,14 @@ class LoopTests(unittest.TestCase):
         def respond(**kwargs):
             requests.append(copy.deepcopy(kwargs["messages"]))
             return next(streams)
-        with patch.object(agent_loop, "MAX_CONTEXT_CHARS", 1000), patch.object(
+        with patch.object(agent_loop, "MAX_CONTEXT_CHARS", budget), patch.object(
             agent_loop.client.chat.completions, "create", side_effect=respond
         ), patch.object(agent_loop, "TOOL_FUNCTIONS", {"echo": lambda: "x" * 2000}):
             agent_loop.run_turn(messages, "question", model_name="test-model")
         self.assertEqual(len(requests), 2)
         self.assertEqual(requests[1][-1]["tool_call_id"], "id")
         self.assertIn("TRUNCATED", requests[1][-1]["content"])
-        self.assertLessEqual(len(str(requests[1])), 1000)
+        self.assertLessEqual(len(json.dumps(requests[1], ensure_ascii=False)), budget)
 
     def test_file_at_read_limit_still_returns_result_to_model(self):
         from tools import file_tools

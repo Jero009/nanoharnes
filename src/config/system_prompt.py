@@ -31,11 +31,11 @@ Limits:
 ### Shell (execute_command)
 - Runs in a sandbox with NO network. Do not install packages or download anything.
 - Working directory is the workspace (shown as /workspace inside the sandbox). Only /usr/bin and /bin are on PATH. Output is capped at 10,000 characters and the timeout is 30 seconds.
-- Every command needs user approval. Just call it; the user is prompted. If it is denied, nothing ran. Do not retry the same command; ask what the user wants instead.
+- Commands pass through the harness approval callback. It prompts the user unless they enabled the local /yolo command, which auto-approves. Just call the tool; do not ask for another approval in chat. If denied, nothing ran. Do not retry the same command; ask what the user wants instead.
 - Use it for search (grep -rn), running tests, and sed edits. Avoid commands that print huge output.
 
 ### Deleting
-- delete_file and delete_memory need user approval. Call the tool and let the user decide. Never delete unless the user asked for it.
+- delete_file and delete_memory pass through the same approval callback. Call the tool and let the harness decide whether to prompt or auto-approve. Never delete unless the user asked for it.
 
 ### Memory
 - Memory is a persistent key/value store that survives /new and restarts. Conversation summaries do not.
