@@ -8,7 +8,7 @@ from config import ALLOWED_DIR,MAX_OUTPUT_CHARS
 
 
 def execute_command(command: str, *, approve: Callable[[str], bool] | None = None) -> str:
-    """Run a shell command in the isolated workspace. Network is disabled."""
+    """Run sandboxed shell command (no network, requires approval, 30s timeout)."""
     sandbox = shutil.which("bwrap")
     if sandbox is None:
         return "Error: bubblewrap is required to run shell commands safely."
