@@ -9,8 +9,8 @@ from context.history import trim_history, budget_history, trim_with_summary
 from tools import TOOLS, TOOL_FUNCTIONS
 
 
-def new_messages() -> list[dict]:
-    return [{"role": "system", "content": SYSTEM_PROMPT}]
+def new_messages(tool_rounds: int = MAX_TOOL_ROUNDS) -> list[dict]:
+    return [{"role": "system", "content": SYSTEM_PROMPT.format(tool_rounds=tool_rounds)}]
 
 
 def run_turn(
@@ -20,8 +20,13 @@ def run_turn(
     emit: Callable[[str, str], None] = lambda kind, text: None,
     approve: Callable[[str], bool] | None = None,
     model_name: str | None = None,
+    max_tool_rounds: int | None = None,
+    tools: list[dict] | None = None,
+    tool_functions: dict | None = None,
 ) -> None:
     """Run one user turn; emit streamed text without owning a terminal UI."""
+    if max_tool_rounds is None:
+        max_tool_rounds = MAX_TOOL_ROUNDS
     messages.append({"role": "user", "content": user_input})
     if model_name is None:
         try:
@@ -49,7 +54,7 @@ def run_turn(
         response_stream = client.chat.completions.create(
             model=model_name,
             messages=request_messages,
-            tools=TOOLS,  # advertise only the model-visible tool schemas
+            tools=TOOLS if tools is None else tools,
             tool_choice="auto",
             stream=True,
             temperature=0.6,
@@ -147,9 +152,9 @@ def run_turn(
         if not tool_calls_data:
             return
 
-        if tool_rounds >= MAX_TOOL_ROUNDS:
+        if tool_rounds >= max_tool_rounds:
             result = (
-                f"Error: Maximum tool rounds ({MAX_TOOL_ROUNDS}) exceeded. "
+                f"Error: Maximum tool rounds ({max_tool_rounds}) exceeded. "
                 "Stop using tools and give the user a final answer."
             )
             for tc in tool_calls_data.values():
@@ -168,7 +173,7 @@ def run_turn(
                 arguments = json.loads(tc["arguments"])
                 if not isinstance(arguments, dict):
                     raise TypeError("arguments must be a JSON object")
-                tool_function = TOOL_FUNCTIONS.get(tool_name)
+                tool_function = (TOOL_FUNCTIONS if tool_functions is None else tool_functions).get(tool_name)
                 if tool_function is None:
                     result = f"Error: tool '{tool_name}' is not allowed."
                 elif tool_name in ("delete_file", "execute_command"):

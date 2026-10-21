@@ -5,3 +5,7 @@ __pycache__/
 .nanoharness/
 /workspace/
 /src/memory/memories.json
+/*.jsonl
+/dev-smoke/
+/base-run/
+/tuned-run/

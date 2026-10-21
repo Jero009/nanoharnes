@@ -41,6 +41,36 @@ uv run python -m unittest discover -s tests -v
 
 The shell tests execute real bubblewrap commands on Linux. For the published 1.0 release's verification scope and remaining live-test gaps, see its [release notes](https://github.com/Jero009/nanoharnes/releases/tag/v1.0.0). The release tag retains the original audit documents. Check actual tool results and stored data rather than assuming a successful tool call.
 
+## SWE-bench Lite on your PC
+
+This is a **coding-agent** evaluation, not a model-only test. Use a Linux PC (or WSL2 with Docker and working bubblewrap user namespaces), with `git`, `uv`, `bwrap`, Docker, and an OpenAI-compatible local model server. The official Docker evaluator recommends at least 120 GB free disk and 16 GB RAM. NanoHarness itself still needs its ordinary `BASE_URL` and `API_KEY` in `.env`; for LM Studio, start the server and load a tool-capable model first. Check the exact model ID with `curl http://localhost:1234/v1/models` rather than relying on its order. **Do not run this in your normal NanoHarness workspace.**
+
+From your NanoHarness checkout, first test one of the 23 development instances:
+
+```bash
+uv sync --frozen
+uv run --with datasets python export_swebench_lite.py --split dev \
+  --revision 6ec7bb89b9342f664a54a6e0a6ea6501d3437cc2 --output dev.jsonl
+head -n 1 dev.jsonl > dev-one.jsonl
+uv run python benchmark_batch.py --manifest dev-one.jsonl \
+  --run-dir dev-smoke --model 'EXACT_MODEL_ID'
+```
+
+The export writes **only** issue text, repository, base commit and instance ID; it omits solution and grading patches. The batch driver fetches only the base commit into a new temporary Git checkout per issue, runs the existing headless NanoHarness loop with 20 tool rounds (the interactive default stays 5), disables memory tools and automatically approves sandboxed shell/file operations **only inside the disposable checkout**, then writes `dev-smoke/predictions.jsonl`. Failures appear in `dev-smoke/failures.jsonl` as empty predictions. Empty patches are not successful fixes. Each run directory must be new; the temporary checkout is removed after each issue. The agent's shell has no network, a 30-second per-command timeout and no automatic access to repository-specific installed Python dependencies; the official evaluator runs tests separately. Check failure counts, tool-call behavior, and patch content before scaling up. Never put private data or secrets in the benchmark checkout.
+
+Grade the smoke prediction with the official SWE-bench Docker evaluator installed in a **separate environment** on your PC (follow [its installation guide](https://www.swebench.com/SWE-bench/installation/), not NanoHarness's `.venv`):
+
+```bash
+python -m swebench.harness.run_evaluation \
+  --dataset_name princeton-nlp/SWE-bench_Lite --split dev \
+  --predictions_path /ABS/PATH/TO/dev-smoke/predictions.jsonl \
+  --max_workers 1 --cache_level base --run_id nh-dev-smoke
+```
+
+When this passes end to end, export `--split test` to a new `test.jsonl`, run `benchmark_batch.py --manifest test.jsonl --run-dir base-run --model 'BASE_ID'`, and grade with `--split test --run_id nh-base`. After fine-tuning the **same base checkpoint**, load the tuned model in the same server and rerun the **same** `test.jsonl` with `--run-dir tuned-run --model 'TUNED_ID'`, then grade with `--run_id nh-tuned`. Never reuse evaluator `run_id` across different predictions: its result cache does not account for changed patches. Compare resolved instances and errors in each evaluator's `logs/evaluation/<run_id>/results.json` and per-instance reports. Pin the NanoHarness commit, dataset revision, evaluator version, model/server configuration, tool-round limit and prompt for both runs. Do not train on the test issues, gold patches, or grading results; use development data to choose the setup **before** scoring the test split.
+
+This runner intentionally handles one issue per process and tasks sequentially to keep a local GPU from being oversubscribed. It does not install per-repository dependencies in the agent's bubblewrap shell; if you require in-agent test execution on SWE-bench environments, that needs a separately verified sandbox/environment integration rather than unsandboxed commands. Do not interpret a server/model error as a benchmark score improvement.
+
 ## Memory and context
 
 These are cooperating mechanisms, **not selectable modes**. The model may save and retrieve persistent facts with memory tools; `.nanoharness/memories.json` survives `/new` and restarts. Creation and updates are automatic; deletion and size-triggered compaction require approval. Conversation summaries are session-only: after chat exceeds 15 messages, NanoHarness asks the model to summarize complete older turns before keeping the newest eight user turns. If summarization fails, it reports the failure and uses the eight-turn trim. A 100,000-character serialized request budget may omit older turns or shorten tool results even earlier. `/new` resets the conversation but not persistent memory; `/clear` only hides the visible chat.

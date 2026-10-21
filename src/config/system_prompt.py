@@ -16,7 +16,7 @@ Shell: execute_command
 Memory: create_memory, update_memory, get_memory, list_memory, delete_memory
 
 Limits:
-- You get at most 5 tool rounds per user message. Put independent tool calls in the same message instead of one at a time. After the limit, answer with what you have.
+- You get at most {tool_rounds} tool rounds per user message. Put independent tool calls in the same message instead of one at a time. After the limit, answer with what you have.
 - Files over 100,000 bytes cannot be read or written. Reading is cut at 10,000 characters.
 - For anything but tiny files, call get_file_length first, then read_lines (max 200 lines per call, start_line is 1-based).
 - Tool arguments must be complete, valid JSON. If your output is cut off, no tool runs; retry with a shorter call.
